@@ -158,6 +158,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         page.addView(TextView(this).apply {
+            text = "⌂  HOME       ▤  DOCUMENTS       ✦  TOOLS"
+            textSize = 13f
+            gravity = Gravity.CENTER
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(blue)
+            setPadding(0, dp(16), 0, dp(16))
+            background = rounded(Color.WHITE, 16)
+            setOnClickListener { showAllPdfs() }
+        }, matchWrap().apply { topMargin = dp(10); bottomMargin = dp(10) })
+
+        page.addView(TextView(this).apply {
             text = "🔒  Your files stay on your device. OCR runs on-device."
             textSize = 12f
             gravity = Gravity.CENTER
