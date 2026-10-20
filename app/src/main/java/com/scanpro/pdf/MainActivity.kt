@@ -88,6 +88,8 @@ class MainActivity : AppCompatActivity() {
         }
         val scroll = ScrollView(this).apply { clipToPadding = false }
         scroll.addView(page)
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
 
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -158,24 +160,58 @@ class MainActivity : AppCompatActivity() {
         }
 
         page.addView(TextView(this).apply {
-            text = "⌂  HOME       ▤  DOCUMENTS       ✦  TOOLS"
-            textSize = 13f
-            gravity = Gravity.CENTER
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(blue)
-            setPadding(0, dp(16), 0, dp(16))
-            background = rounded(Color.WHITE, 16)
-            setOnClickListener { showAllPdfs() }
-        }, matchWrap().apply { topMargin = dp(10); bottomMargin = dp(10) })
-
-        page.addView(TextView(this).apply {
             text = "🔒  Your files stay on your device. OCR runs on-device."
             textSize = 12f
             gravity = Gravity.CENTER
             setTextColor(muted)
             setPadding(0, dp(22), 0, 0)
         })
-        setContentView(scroll)
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            background = rounded(Color.WHITE, 18)
+            elevation = dp(6).toFloat()
+        }
+        val home = TextView(this).apply {
+            text = "⌂\nHome"
+            gravity = Gravity.CENTER
+            textSize = 12f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(blue)
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+            setOnClickListener { buildHome() }
+        }
+        val docs = TextView(this).apply {
+            text = "▤\nDocuments"
+            gravity = Gravity.CENTER
+            textSize = 12f
+            setTextColor(muted)
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+            setOnClickListener { showAllPdfs() }
+        }
+        val tools = TextView(this).apply {
+            text = "✦\nTools"
+            gravity = Gravity.CENTER
+            textSize = 12f
+            setTextColor(muted)
+            setPadding(dp(12), dp(4), dp(12), dp(4))
+            setOnClickListener {
+                AlertDialog.Builder(this@MainActivity).setTitle("PDF tools")
+                    .setItems(arrayOf("Scan document", "Images to PDF", "Text recognition (OCR)")) { _, which ->
+                        when (which) {
+                            0 -> launchDocumentScanner()
+                            1 -> imagePicker.launch("image/*")
+                            2 -> ocrPicker.launch("image/*")
+                        }
+                    }.show()
+            }
+        }
+        nav.addView(home, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        nav.addView(docs, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        nav.addView(tools, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        root.addView(nav, matchWrap().apply { leftMargin = dp(12); rightMargin = dp(12); bottomMargin = dp(8) })
+        setContentView(root)
     }
 
     private fun sectionTitle(parent: LinearLayout, title: String) {
