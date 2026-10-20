@@ -31,4 +31,5 @@ dependencies {
     implementation("androidx.activity:activity-ktx:1.10.0")
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 }
