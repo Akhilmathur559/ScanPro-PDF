@@ -129,7 +129,27 @@ class MainActivity : AppCompatActivity() {
             page, "🔎", "Text recognition (OCR)", "Extract printed text from an image", "EXTRACT TEXT"
         ) { ocrPicker.launch("image/*") }
 
-        sectionTitle(page, "YOUR DOCUMENTS")
+        val libraryHeader = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val libraryTitle = TextView(this).apply {
+            text = "YOUR DOCUMENTS"
+            textSize = 11f
+            letterSpacing = 0.12f
+            setTextColor(muted)
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        libraryHeader.addView(libraryTitle, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        libraryHeader.addView(TextView(this).apply {
+            text = "VIEW ALL  ›"
+            textSize = 11f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(blue)
+            setPadding(dp(8), dp(6), dp(2), dp(6))
+            setOnClickListener { showAllPdfs() }
+        })
+        page.addView(libraryHeader, matchWrap().apply { topMargin = dp(2); bottomMargin = dp(12) })
         val saved = outputFolder().listFiles { f -> f.isFile && f.extension.equals("pdf", true) }
             ?.sortedByDescending { it.lastModified() }.orEmpty()
         val summary = TextView(this).apply {
@@ -283,13 +303,18 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(13), dp(12), dp(10), dp(12))
-            background = rounded(Color.WHITE, 15)
+            background = rounded(Color.WHITE, 17)
+            elevation = dp(1).toFloat()
             setOnClickListener { showPdfOptions(pdf) }
         }
         row.addView(TextView(this).apply {
-            text = "📄"
-            textSize = 23f
-            setPadding(0, 0, dp(10), 0)
+            text = "PDF"
+            textSize = 10f
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setTextColor(blue)
+            background = rounded(Color.rgb(235, 241, 255), 10)
+            setPadding(dp(9), dp(13), dp(9), dp(13))
         })
         val details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         details.addView(TextView(this).apply {
