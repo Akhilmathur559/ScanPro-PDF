@@ -23,10 +23,14 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.IntentSenderRequest
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanningOptions
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.io.File
@@ -55,10 +59,20 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.GetContent()
     ) { uri -> if (uri != null) runOcr(uri) }
 
-    private val cameraPicker = registerForActivityResult(
-        ActivityResultContracts.TakePicturePreview()
-    ) { bitmap ->
-        if (bitmap != null) createPdfFromBitmaps(listOf(bitmap))
+    private val scannerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            val scanResult = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
+            val pdfUri = scanResult?.pdf?.uri
+            if (pdfUri != null) {
+                saveScannedPdf(pdfUri)
+            } else {
+                toast("Scan completed, but no PDF was returned")
+            }
+        } else if (result.resultCode != RESULT_CANCELED) {
+            toast("Document scan could not be completed")
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,8 +118,8 @@ class MainActivity : AppCompatActivity() {
 
         sectionTitle(page, "QUICK ACTIONS")
         val cameraCard = addAction(
-            page, "📷", "Scan document", "Capture a page and save it as PDF", "START SCANNING"
-        ) { cameraPicker.launch(null) }
+            page, "📷", "Scan document", "Auto-crop, enhance and scan multiple pages", "START SCANNING"
+        ) { launchDocumentScanner() }
         val imageCard = addAction(
             page, "🖼️", "Images to PDF", "Combine multiple pictures into one PDF", "CHOOSE IMAGES"
         ) { imagePicker.launch("image/*") }
@@ -342,6 +356,45 @@ class MainActivity : AppCompatActivity() {
                     } else toast("Could not rename PDF")
                 }
             }.show()
+    }
+
+    private fun launchDocumentScanner() {
+        val options = GmsDocumentScanningOptions.Builder()
+            .setGalleryImportAllowed(true)
+            .setPageLimit(30)
+            .setResultFormats(
+                GmsDocumentScanningOptions.RESULT_FORMAT_PDF,
+                GmsDocumentScanningOptions.RESULT_FORMAT_JPEG
+            )
+            .setScannerMode(GmsDocumentScanningOptions.SCANNER_MODE_FULL)
+            .build()
+
+        GmsDocumentScanning.getClient(options)
+            .getStartScanIntent(this)
+            .addOnSuccessListener { intentSender ->
+                scannerLauncher.launch(IntentSenderRequest.Builder(intentSender).build())
+            }
+            .addOnFailureListener { error ->
+                toast("Scanner could not start: " + (error.localizedMessage ?: "check Google Play services"))
+            }
+    }
+
+    private fun saveScannedPdf(uri: Uri) {
+        try {
+            val folder = outputFolder()
+            if (!folder.exists()) folder.mkdirs()
+            val file = File(folder, "ScanPro_Scan_" + System.currentTimeMillis() + ".pdf")
+            contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(file).use { output -> input.copyTo(output) }
+            } ?: run {
+                toast("Could not read the scanned PDF")
+                return
+            }
+            toast("Scanned PDF saved: " + file.name)
+            buildHome()
+        } catch (error: Exception) {
+            toast("Could not save scanned PDF: " + (error.localizedMessage ?: "unknown error"))
+        }
     }
 
     private fun createPdfFromUris(uris: List<Uri>) {
