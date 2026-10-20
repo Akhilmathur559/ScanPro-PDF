@@ -84,7 +84,7 @@ class MainActivity : AppCompatActivity() {
         val page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(18), dp(20), dp(28))
-            setBackgroundColor(Color.rgb(246, 248, 252))
+            setBackgroundColor(Color.rgb(247, 249, 253))
         }
         val scroll = ScrollView(this).apply { clipToPadding = false }
         scroll.addView(page)
@@ -92,17 +92,17 @@ class MainActivity : AppCompatActivity() {
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(22), dp(20), dp(22))
-            background = rounded(Color.rgb(24, 67, 160), 24)
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(29, 78, 216), Color.rgb(79, 70, 229))).apply { cornerRadius = dp(26).toFloat() }
         }
         hero.addView(TextView(this).apply {
-            text = "SCANPRO  PDF"
+            text = "SCANPRO  PDF  |  WORKSPACE"
             textSize = 12f
             letterSpacing = 0.14f
             setTextColor(Color.rgb(191, 219, 254))
             typeface = Typeface.DEFAULT_BOLD
         })
         hero.addView(TextView(this).apply {
-            text = "Paperwork,\nmade simple."
+            text = "Everything,\nmade simple."
             textSize = 30f
             setLineSpacing(dp(2).toFloat(), 1f)
             setTextColor(Color.WHITE)
@@ -185,8 +185,8 @@ class MainActivity : AppCompatActivity() {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(15), dp(16), dp(15))
-            background = rounded(Color.WHITE, 18)
-            elevation = dp(2).toFloat()
+            background = rounded(Color.WHITE, 22)
+            elevation = dp(3).toFloat()
         }
         val top = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -196,7 +196,7 @@ class MainActivity : AppCompatActivity() {
             text = icon
             textSize = 25f
             gravity = Gravity.CENTER
-            background = rounded(Color.rgb(239, 244, 255), 14)
+            background = rounded(Color.rgb(235, 241, 255), 15)
             setPadding(dp(10), dp(9), dp(10), dp(9))
         })
         val textColumn = LinearLayout(this).apply {
