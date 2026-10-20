@@ -49,6 +49,17 @@ jobs:
         run: |
           APK="app/build/outputs/apk/debug/app-debug.apk"
           "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)/apksigner" verify --print-certs "$APK"
+      - name: Save signing certificate fingerprint
+        shell: bash
+        run: |
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          "$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)/apksigner" verify --print-certs "$APK" | tee signing-certificate.txt
+      - name: Upload signing fingerprint
+        uses: actions/upload-artifact@v4
+        with:
+          name: ScanPro-PDF-signing-fingerprint
+          path: signing-certificate.txt
+          if-no-files-found: error
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
