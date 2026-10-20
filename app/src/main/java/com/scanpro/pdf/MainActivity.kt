@@ -95,159 +95,185 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildHome() {
+        val bg = Color.rgb(10, 12, 23)
+        val panel = Color.rgb(23, 27, 44)
+        val panelAlt = Color.rgb(31, 35, 56)
+        val violet = Color.rgb(167, 139, 250)
+        val cyan = Color.rgb(103, 232, 249)
         val page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(18), dp(20), dp(28))
-            setBackgroundColor(Color.rgb(12, 14, 26))
+            setPadding(dp(20), dp(18), dp(20), dp(24))
+            setBackgroundColor(bg)
         }
-        val scroll = ScrollView(this).apply { clipToPadding = false }
+        val scroll = ScrollView(this).apply { clipToPadding = false; isFillViewport = false }
         scroll.addView(page)
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(bg) }
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
 
-        val hero = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(22), dp(20), dp(22))
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(91, 33, 182), Color.rgb(37, 99, 235), Color.rgb(14, 165, 233))).apply { cornerRadius = dp(26).toFloat() }
-        }
-        hero.addView(TextView(this).apply {
-            text = "✦  SCANPRO PDF  /  YOUR WORKSPACE"
-            textSize = 12f
-            letterSpacing = 0.14f
-            setTextColor(Color.rgb(191, 219, 254))
-            typeface = Typeface.DEFAULT_BOLD
-        })
-        hero.addView(TextView(this).apply {
-            text = "Your documents.\nYour flow."
-            textSize = 30f
-            setLineSpacing(dp(2).toFloat(), 1f)
-            setTextColor(Color.WHITE)
-            typeface = Typeface.DEFAULT_BOLD
-            setPadding(0, dp(10), 0, dp(8))
-        })
-        hero.addView(TextView(this).apply {
-            text = "A smarter space to scan, organize and work with every document."
-            textSize = 14f
-            setTextColor(Color.rgb(219, 234, 254))
-        })
-        page.addView(hero, matchWrap().apply { bottomMargin = dp(24) })
-
-        sectionTitle(page, "QUICK ACTIONS")
-        val cameraCard = addAction(
-            page, "📷", "Scan document", "Auto-crop, enhance and scan multiple pages", "START SCANNING"
-        ) { launchDocumentScanner() }
-        val imageCard = addAction(
-            page, "🖼️", "Images to PDF", "Combine multiple pictures into one PDF", "CHOOSE IMAGES"
-        ) { imagePicker.launch("image/*") }
-        addAction(
-            page, "🔎", "Text recognition (OCR)", "Extract printed text from an image", "EXTRACT TEXT"
-        ) { ocrPicker.launch("image/*") }
-
-        val libraryHeader = LinearLayout(this).apply {
+        val top = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(3), 0, dp(20))
         }
-        val libraryTitle = TextView(this).apply {
-            text = "RECENT FILES"
-            textSize = 11f
-            letterSpacing = 0.12f
-            setTextColor(muted)
+        val brandIcon = TextView(this).apply {
+            text = "S"
+            textSize = 23f
             typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(139, 92, 246), Color.rgb(59, 130, 246))).apply { cornerRadius = dp(15).toFloat() }
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
         }
-        libraryHeader.addView(libraryTitle, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        libraryHeader.addView(TextView(this).apply {
-            text = "VIEW ALL  ↗"
-            textSize = 11f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(blue)
-            setPadding(dp(8), dp(6), dp(2), dp(6))
-            setOnClickListener { showAllPdfs() }
+        top.addView(brandIcon)
+        val brandText = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), 0, 0, 0) }
+        brandText.addView(TextView(this).apply { text = "ScanPro"; textSize = 21f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE) })
+        brandText.addView(TextView(this).apply { text = "PDF STUDIO"; textSize = 10f; letterSpacing = 0.20f; typeface = Typeface.DEFAULT_BOLD; setTextColor(violet) })
+        top.addView(brandText, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        top.addView(TextView(this).apply {
+            text = "✦"
+            textSize = 22f
+            gravity = Gravity.CENTER
+            setTextColor(cyan)
+            background = rounded(panelAlt, 16)
+            layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
         })
-        page.addView(libraryHeader, matchWrap().apply { topMargin = dp(2); bottomMargin = dp(12) })
-        val saved = outputFolder().listFiles { f -> f.isFile && f.extension.equals("pdf", true) }
-            ?.sortedByDescending { it.lastModified() }.orEmpty()
-        val summary = TextView(this).apply {
-            text = if (saved.isEmpty()) "No PDFs yet. Scan a page or choose images to get started."
-                else "${saved.size} PDF file(s) saved on this device"
-            textSize = 13f
-            setTextColor(muted)
-            setPadding(dp(2), 0, 0, dp(10))
-        }
-        page.addView(summary)
-        if (saved.isEmpty()) {
-            val empty = TextView(this).apply {
-                text = "📄\n\nYour recent PDFs will appear here"
-                textSize = 15f
-                gravity = Gravity.CENTER
-                setTextColor(muted)
-                setPadding(dp(18), dp(24), dp(18), dp(24))
-                background = rounded(Color.rgb(25, 29, 47), 18)
-            }
-            page.addView(empty, matchWrap().apply { bottomMargin = dp(12) })
-        } else {
-            saved.take(8).forEach { pdf ->
-                addPdfRow(page, pdf)
-            }
-            if (saved.size > 8) {
-                addTextButton(page, "View all ${saved.size} PDFs") { showAllPdfs() }
-            }
-        }
+        page.addView(top, matchWrap())
 
         page.addView(TextView(this).apply {
-            text = "✦  PRIVATE BY DESIGN  ·  FILES STAY ON YOUR DEVICE"
-            textSize = 12f
-            gravity = Gravity.CENTER
+            text = "YOUR PAPERWORK,\\nREIMAGINED."
+            textSize = 29f
+            setLineSpacing(dp(1).toFloat(), 1.0f)
+            typeface = Typeface.create("sans-serif-black", Typeface.NORMAL)
+            setTextColor(Color.WHITE)
+            letterSpacing = -0.025f
+        }, matchWrap())
+        page.addView(TextView(this).apply {
+            text = "Everything you need. One clean workspace."
+            textSize = 14f
             setTextColor(muted)
-            setPadding(0, dp(22), 0, 0)
-        })
-        val nav = LinearLayout(this).apply {
+            setPadding(0, dp(8), 0, dp(20))
+        }, matchWrap())
+
+        val scan = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(dp(8), dp(8), dp(8), dp(8))
-            background = rounded(Color.rgb(25, 29, 47), 18)
-            elevation = dp(6).toFloat()
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(18), dp(20), dp(14), dp(20))
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(109, 40, 217), Color.rgb(67, 56, 202), Color.rgb(37, 99, 235))).apply { cornerRadius = dp(25).toFloat() }
+            elevation = dp(5).toFloat()
+            setOnClickListener { launchDocumentScanner() }
         }
-        val home = TextView(this).apply {
-            text = "◈\nHOME"
-            gravity = Gravity.CENTER
-            textSize = 12f
+        val scanCopy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        scanCopy.addView(TextView(this).apply { text = "✦  QUICK CAPTURE"; textSize = 10f; letterSpacing = 0.16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(221, 214, 254)) })
+        scanCopy.addView(TextView(this).apply { text = "Scan a document"; textSize = 21f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE); setPadding(0, dp(7), 0, dp(4)) })
+        scanCopy.addView(TextView(this).apply { text = "Auto crop  ·  Enhance  ·  Save PDF"; textSize = 12f; setTextColor(Color.rgb(235, 233, 255)) })
+        scan.addView(scanCopy, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        scan.addView(TextView(this).apply { text = "↗"; textSize = 28f; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = rounded(Color.rgb(255, 255, 255).let { Color.argb(38, 255, 255, 255) }, 16); layoutParams = LinearLayout.LayoutParams(dp(48), dp(48)) })
+        page.addView(scan, matchWrap().apply { bottomMargin = dp(25) })
+
+        page.addView(TextView(this).apply {
+            text = "THE TOOLKIT"
+            textSize = 11f
+            letterSpacing = 0.18f
             typeface = Typeface.DEFAULT_BOLD
-            setTextColor(blue)
-            setPadding(dp(12), dp(4), dp(12), dp(4))
-            setOnClickListener { buildHome() }
-        }
-        val docs = TextView(this).apply {
-            text = "▤\nLIBRARY"
-            gravity = Gravity.CENTER
-            textSize = 12f
-            setTextColor(muted)
-            setPadding(dp(12), dp(4), dp(12), dp(4))
-            setOnClickListener { showAllPdfs() }
-        }
-        val tools = TextView(this).apply {
-            text = "✧\nTOOLS"
-            gravity = Gravity.CENTER
-            textSize = 12f
-            setTextColor(muted)
-            setPadding(dp(12), dp(4), dp(12), dp(4))
-            setOnClickListener {
-                AlertDialog.Builder(this@MainActivity).setTitle("PDF tools")
-                    .setItems(arrayOf("Scan document", "Images to PDF", "Text recognition (OCR)", "Merge PDFs", "Split PDF pages", "Rotate PDF pages")) { _, which ->
-                        when (which) {
-                            0 -> launchDocumentScanner()
-                            1 -> imagePicker.launch("image/*")
-                            2 -> ocrPicker.launch("image/*")
-                            3 -> mergePicker.launch("application/pdf")
-                            4 -> splitPicker.launch("application/pdf")
-                            5 -> rotatePicker.launch("application/pdf")
-                        }
-                    }.show()
+            setTextColor(violet)
+        }, matchWrap().apply { bottomMargin = dp(12) })
+
+        fun tile(icon: String, title: String, subtitle: String, tint: Int, action: () -> Unit): LinearLayout {
+            return LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(14), dp(15), dp(12), dp(15))
+                background = rounded(panel, 20)
+                setOnClickListener { action() }
+                addView(TextView(this@MainActivity).apply {
+                    text = icon; textSize = 22f; gravity = Gravity.CENTER
+                    setTextColor(tint); background = rounded(panelAlt, 13)
+                    layoutParams = LinearLayout.LayoutParams(dp(43), dp(43)).apply { bottomMargin = dp(13) }
+                })
+                addView(TextView(this@MainActivity).apply { text = title; textSize = 15f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE) })
+                addView(TextView(this@MainActivity).apply { text = subtitle; textSize = 11f; setTextColor(muted); setPadding(0, dp(5), 0, 0) })
             }
         }
-        nav.addView(home, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        nav.addView(docs, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        nav.addView(tools, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        root.addView(nav, matchWrap().apply { leftMargin = dp(12); rightMargin = dp(12); bottomMargin = dp(8) })
+        fun toolRow(left: View, right: View) {
+            val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            row.addView(left, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = dp(8) })
+            row.addView(right, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { leftMargin = dp(8) })
+            page.addView(row, matchWrap().apply { bottomMargin = dp(12) })
+        }
+        toolRow(
+            tile("▧", "Images to PDF", "Photo collection", cyan) { imagePicker.launch("image/*") },
+            tile("Aa", "Text scanner", "Extract with OCR", violet) { ocrPicker.launch("image/*") }
+        )
+        toolRow(
+            tile("⇄", "Merge PDFs", "Combine files", Color.rgb(251, 191, 36)) { mergePicker.launch("application/pdf") },
+            tile("✂", "Split pages", "Pick page ranges", Color.rgb(251, 113, 133)) { splitPicker.launch("application/pdf") }
+        )
+        toolRow(
+            tile("↻", "Rotate PDF", "Fix page orientation", cyan) { rotatePicker.launch("application/pdf") },
+            tile("▤", "All documents", "Browse your library", violet) { showAllPdfs() }
+        )
+
+        val saved = outputFolder().listFiles { f -> f.isFile && f.extension.equals("pdf", true) }
+            ?.sortedByDescending { it.lastModified() }.orEmpty()
+        val libraryHeader = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        libraryHeader.addView(TextView(this).apply {
+            text = "RECENT FILES"; textSize = 11f; letterSpacing = 0.17f
+            typeface = Typeface.DEFAULT_BOLD; setTextColor(violet)
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        libraryHeader.addView(TextView(this).apply {
+            text = "See all  ↗"; textSize = 12f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(cyan); setPadding(dp(8), dp(8), 0, dp(8))
+            setOnClickListener { showAllPdfs() }
+        })
+        page.addView(libraryHeader, matchWrap().apply { topMargin = dp(12); bottomMargin = dp(10) })
+        if (saved.isEmpty()) {
+            val empty = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER
+                setPadding(dp(18), dp(22), dp(18), dp(22)); background = rounded(panel, 20)
+                addView(TextView(this@MainActivity).apply { text = "▤"; textSize = 28f; setTextColor(violet); gravity = Gravity.CENTER })
+                addView(TextView(this@MainActivity).apply { text = "Your files will live here"; textSize = 15f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE); gravity = Gravity.CENTER; setPadding(0, dp(7), 0, dp(4)) })
+                addView(TextView(this@MainActivity).apply { text = "Create your first scan to get started"; textSize = 12f; setTextColor(muted); gravity = Gravity.CENTER })
+            }
+            page.addView(empty, matchWrap())
+        } else {
+            saved.take(5).forEach { pdf -> addPdfRow(page, pdf) }
+        }
+        page.addView(TextView(this).apply {
+            text = "PRIVATE BY DESIGN  ·  PROCESSED ON YOUR DEVICE"
+            textSize = 9f; letterSpacing = 0.10f; gravity = Gravity.CENTER
+            setTextColor(Color.rgb(105, 112, 140)); setPadding(0, dp(24), 0, dp(8))
+        }, matchWrap())
+
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            background = rounded(Color.rgb(23, 27, 44), 22)
+            elevation = dp(10).toFloat()
+        }
+        fun navItem(symbol: String, label: String, active: Boolean, action: () -> Unit): TextView =
+            TextView(this).apply {
+                text = "$symbol\\n$label"; gravity = Gravity.CENTER; textSize = 11f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(if (active) Color.WHITE else muted)
+                if (active) background = rounded(Color.rgb(104, 74, 210), 15)
+                setPadding(dp(12), dp(9), dp(12), dp(9))
+                setOnClickListener { action() }
+            }
+        nav.addView(navItem("◈", "HOME", true) { buildHome() }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        nav.addView(navItem("▤", "LIBRARY", false) { showAllPdfs() }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        nav.addView(navItem("✧", "TOOLS", false) {
+            AlertDialog.Builder(this@MainActivity).setTitle("PDF Studio")
+                .setItems(arrayOf("Scan document", "Images to PDF", "Text recognition (OCR)", "Merge PDFs", "Split PDF pages", "Rotate PDF pages")) { _, which ->
+                    when (which) {
+                        0 -> launchDocumentScanner()
+                        1 -> imagePicker.launch("image/*")
+                        2 -> ocrPicker.launch("image/*")
+                        3 -> mergePicker.launch("application/pdf")
+                        4 -> splitPicker.launch("application/pdf")
+                        5 -> rotatePicker.launch("application/pdf")
+                    }
+                }.show()
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        root.addView(nav, matchWrap().apply { leftMargin = dp(14); rightMargin = dp(14); topMargin = dp(8); bottomMargin = dp(10) })
         setContentView(root)
     }
 
