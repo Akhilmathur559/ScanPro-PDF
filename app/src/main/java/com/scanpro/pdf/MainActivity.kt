@@ -44,9 +44,9 @@ import java.util.Date
 import kotlin.math.min
 
 class MainActivity : AppCompatActivity() {
-    private val blue = Color.rgb(37, 99, 235)
-    private val ink = Color.rgb(20, 31, 55)
-    private val muted = Color.rgb(102, 112, 133)
+    private val blue = Color.rgb(139, 92, 246)
+    private val ink = Color.rgb(242, 244, 255)
+    private val muted = Color.rgb(159, 166, 190)
     private val selectedImages = mutableListOf<Uri>()
 
     private val mergePicker = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
@@ -99,7 +99,7 @@ class MainActivity : AppCompatActivity() {
         val page = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(18), dp(20), dp(28))
-            setBackgroundColor(Color.rgb(247, 249, 253))
+            setBackgroundColor(Color.rgb(12, 14, 26))
         }
         val scroll = ScrollView(this).apply { clipToPadding = false }
         scroll.addView(page)
@@ -109,17 +109,17 @@ class MainActivity : AppCompatActivity() {
         val hero = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(22), dp(20), dp(22))
-            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(29, 78, 216), Color.rgb(79, 70, 229))).apply { cornerRadius = dp(26).toFloat() }
+            background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(91, 33, 182), Color.rgb(37, 99, 235), Color.rgb(14, 165, 233))).apply { cornerRadius = dp(26).toFloat() }
         }
         hero.addView(TextView(this).apply {
-            text = "SCANPRO  PDF  |  WORKSPACE"
+            text = "✦  SCANPRO PDF  /  YOUR WORKSPACE"
             textSize = 12f
             letterSpacing = 0.14f
             setTextColor(Color.rgb(191, 219, 254))
             typeface = Typeface.DEFAULT_BOLD
         })
         hero.addView(TextView(this).apply {
-            text = "Everything,\nmade simple."
+            text = "Your documents.\nYour flow."
             textSize = 30f
             setLineSpacing(dp(2).toFloat(), 1f)
             setTextColor(Color.WHITE)
@@ -127,7 +127,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, dp(10), 0, dp(8))
         })
         hero.addView(TextView(this).apply {
-            text = "Scan documents, make PDFs and extract text — all on your phone."
+            text = "A smarter space to scan, organize and work with every document."
             textSize = 14f
             setTextColor(Color.rgb(219, 234, 254))
         })
@@ -149,7 +149,7 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         val libraryTitle = TextView(this).apply {
-            text = "YOUR DOCUMENTS"
+            text = "RECENT FILES"
             textSize = 11f
             letterSpacing = 0.12f
             setTextColor(muted)
@@ -157,7 +157,7 @@ class MainActivity : AppCompatActivity() {
         }
         libraryHeader.addView(libraryTitle, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         libraryHeader.addView(TextView(this).apply {
-            text = "VIEW ALL  ›"
+            text = "VIEW ALL  ↗"
             textSize = 11f
             typeface = Typeface.DEFAULT_BOLD
             setTextColor(blue)
@@ -182,7 +182,7 @@ class MainActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER
                 setTextColor(muted)
                 setPadding(dp(18), dp(24), dp(18), dp(24))
-                background = rounded(Color.WHITE, 18)
+                background = rounded(Color.rgb(25, 29, 47), 18)
             }
             page.addView(empty, matchWrap().apply { bottomMargin = dp(12) })
         } else {
@@ -195,7 +195,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         page.addView(TextView(this).apply {
-            text = "🔒  Your files stay on your device. OCR runs on-device."
+            text = "✦  PRIVATE BY DESIGN  ·  FILES STAY ON YOUR DEVICE"
             textSize = 12f
             gravity = Gravity.CENTER
             setTextColor(muted)
@@ -205,11 +205,11 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
             setPadding(dp(8), dp(8), dp(8), dp(8))
-            background = rounded(Color.WHITE, 18)
+            background = rounded(Color.rgb(25, 29, 47), 18)
             elevation = dp(6).toFloat()
         }
         val home = TextView(this).apply {
-            text = "⌂\nHome"
+            text = "◈\nHOME"
             gravity = Gravity.CENTER
             textSize = 12f
             typeface = Typeface.DEFAULT_BOLD
@@ -218,7 +218,7 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener { buildHome() }
         }
         val docs = TextView(this).apply {
-            text = "▤\nDocuments"
+            text = "▤\nLIBRARY"
             gravity = Gravity.CENTER
             textSize = 12f
             setTextColor(muted)
@@ -226,7 +226,7 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener { showAllPdfs() }
         }
         val tools = TextView(this).apply {
-            text = "✦\nTools"
+            text = "✧\nTOOLS"
             gravity = Gravity.CENTER
             textSize = 12f
             setTextColor(muted)
@@ -270,7 +270,7 @@ class MainActivity : AppCompatActivity() {
         val card = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(15), dp(16), dp(15))
-            background = rounded(Color.WHITE, 22)
+            background = rounded(Color.rgb(25, 29, 47), 22)
             elevation = dp(3).toFloat()
         }
         val top = LinearLayout(this).apply {
@@ -281,7 +281,7 @@ class MainActivity : AppCompatActivity() {
             text = icon
             textSize = 25f
             gravity = Gravity.CENTER
-            background = rounded(Color.rgb(235, 241, 255), 15)
+            background = rounded(Color.rgb(47, 39, 83), 15)
             setPadding(dp(10), dp(9), dp(10), dp(9))
         })
         val textColumn = LinearLayout(this).apply {
@@ -321,7 +321,7 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(13), dp(12), dp(10), dp(12))
-            background = rounded(Color.WHITE, 17)
+            background = rounded(Color.rgb(25, 29, 47), 17)
             elevation = dp(1).toFloat()
             setOnClickListener { showPdfOptions(pdf) }
         }
@@ -331,7 +331,7 @@ class MainActivity : AppCompatActivity() {
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
             setTextColor(blue)
-            background = rounded(Color.rgb(235, 241, 255), 10)
+            background = rounded(Color.rgb(47, 39, 83), 10)
             setPadding(dp(9), dp(13), dp(9), dp(13))
         })
         val details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
