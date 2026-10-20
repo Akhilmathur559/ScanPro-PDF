@@ -19,6 +19,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -34,6 +35,8 @@ import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.pdmodel.PDDocument
 import java.io.File
 import java.io.FileOutputStream
 import java.text.DateFormat
@@ -45,6 +48,16 @@ class MainActivity : AppCompatActivity() {
     private val ink = Color.rgb(20, 31, 55)
     private val muted = Color.rgb(102, 112, 133)
     private val selectedImages = mutableListOf<Uri>()
+
+    private val mergePicker = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+        if (uris.size >= 2) mergePdfs(uris) else if (uris.isNotEmpty()) toast("Select at least two PDFs to merge")
+    }
+    private val splitPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) askSplitPages(uri)
+    }
+    private val rotatePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) rotatePdf(uri)
+    }
 
     private val imagePicker = registerForActivityResult(
         ActivityResultContracts.GetMultipleContents()
@@ -78,6 +91,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        PDFBoxResourceLoader.init(applicationContext)
         buildHome()
     }
 
@@ -219,11 +233,14 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(12), dp(4), dp(12), dp(4))
             setOnClickListener {
                 AlertDialog.Builder(this@MainActivity).setTitle("PDF tools")
-                    .setItems(arrayOf("Scan document", "Images to PDF", "Text recognition (OCR)")) { _, which ->
+                    .setItems(arrayOf("Scan document", "Images to PDF", "Text recognition (OCR)", "Merge PDFs", "Split PDF pages", "Rotate PDF pages")) { _, which ->
                         when (which) {
                             0 -> launchDocumentScanner()
                             1 -> imagePicker.launch("image/*")
                             2 -> ocrPicker.launch("image/*")
+                            3 -> mergePicker.launch("application/pdf")
+                            4 -> splitPicker.launch("application/pdf")
+                            5 -> rotatePicker.launch("application/pdf")
                         }
                     }.show()
             }
