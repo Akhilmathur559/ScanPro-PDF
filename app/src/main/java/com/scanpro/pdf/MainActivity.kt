@@ -473,6 +473,8 @@ class MainActivity : AppCompatActivity() {
                 background = rounded(Color.rgb(31, 35, 56), 16)
             }
             page.addView(search, matchWrap().apply { bottomMargin = dp(8) })
+            val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            page.addView(list, matchWrap())
             val sortButton = Button(this).apply {
                 text = "Sort: Newest first"; isAllCaps = false; textSize = 12f
                 setOnClickListener {
@@ -488,7 +490,6 @@ class MainActivity : AppCompatActivity() {
             }
             page.addView(sortButton, matchWrap().apply { bottomMargin = dp(10) })
             val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-            page.addView(list, matchWrap())
             fun render(q: String) { renderLibrary(q, sortMode, files, list) }
             render("")
             search.addTextChangedListener(object : TextWatcher {
