@@ -456,13 +456,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun showLibraryPage() {
         secondaryPage("Your Library", "Search, sort and manage all saved PDFs.", 1) { page ->
-            val files = outputFolder().listFiles { f -> f.isFile && f.extension.equals("pdf", true) }.orEmpty()
+            val files: List<File> = outputFolder()
+                .listFiles { f -> f.isFile && f.extension.equals("pdf", true) }
+                ?.toList()
+                .orEmpty()
             var sortMode = 0 // 0 newest, 1 oldest, 2 name, 3 largest
-            val count = files.size
             val totalBytes = files.sumOf { it.length() }
             val totalLabel = if (totalBytes >= 1024L * 1024L) String.format("%.1f MB", totalBytes / (1024f * 1024f)) else "${totalBytes / 1024} KB"
             page.addView(TextView(this).apply {
-                text = "$count PDFs  ·  $totalLabel used"
+                text = "${files.size} PDFs  ·  $totalLabel used"
                 textSize = 15f; typeface = Typeface.DEFAULT_BOLD
                 setTextColor(Color.rgb(103, 232, 249)); setPadding(0, 0, 0, dp(12))
             }, matchWrap())
@@ -477,20 +479,19 @@ class MainActivity : AppCompatActivity() {
             page.addView(list, matchWrap())
             val sortButton = Button(this).apply {
                 text = "Sort: Newest first"; isAllCaps = false; textSize = 12f
-                setOnClickListener {
-                    AlertDialog.Builder(this@MainActivity)
-                        .setTitle("Sort PDFs")
-                        .setSingleChoiceItems(arrayOf("Newest first", "Oldest first", "Name A–Z", "Largest first"), sortMode) { dialog, which ->
-                            sortMode = which
-                            text = "Sort: " + arrayOf("Newest first", "Oldest first", "Name A–Z", "Largest first")[which]
-                            renderLibrary(search.text.toString(), sortMode, files, list)
-                            dialog.dismiss()
-                        }.setNegativeButton("Cancel", null).show()
-                }
             }
-            page.addView(sortButton, matchWrap().apply { bottomMargin = dp(10) })
-            val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
             fun render(q: String) { renderLibrary(q, sortMode, files, list) }
+            sortButton.setOnClickListener {
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("Sort PDFs")
+                    .setSingleChoiceItems(arrayOf("Newest first", "Oldest first", "Name A–Z", "Largest first"), sortMode) { dialog, which ->
+                        sortMode = which
+                        sortButton.text = "Sort: " + arrayOf("Newest first", "Oldest first", "Name A–Z", "Largest first")[which]
+                        render(search.text.toString())
+                        dialog.dismiss()
+                    }.setNegativeButton("Cancel", null).show()
+            }
+            page.addView(sortButton, 0, matchWrap().apply { bottomMargin = dp(10) })
             render("")
             search.addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
