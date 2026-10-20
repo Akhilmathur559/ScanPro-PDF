@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.ScanPro" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#155EEF</item>
+        <item name="colorPrimaryVariant">#123EA8</item>
+        <item name="colorSecondary">#18A999</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:statusBarColor">#123EA8</item>
+        <item name="android:navigationBarColor">#101828</item>
+    </style>
+</resources>
