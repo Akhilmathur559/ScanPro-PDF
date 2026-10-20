@@ -319,12 +319,9 @@ class MainActivity : AppCompatActivity() {
                 clipData = ClipData.newUri(contentResolver, pdf.name, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            val chooser = Intent.createChooser(intent, "Open PDF with")
-            if (intent.resolveActivity(packageManager) == null) {
-                toast("No PDF viewer found. Install a PDF reader, then try again.")
-                return
-            }
-            startActivity(chooser)
+            // Do not rely on resolveActivity(): Android package-visibility rules can
+            // return null even when a PDF viewer is installed. Let the system chooser resolve it.
+            startActivity(Intent.createChooser(intent, "Open PDF with"))
         } catch (e: Exception) {
             toast("Could not open PDF: " + (e.localizedMessage ?: e.javaClass.simpleName))
         }
