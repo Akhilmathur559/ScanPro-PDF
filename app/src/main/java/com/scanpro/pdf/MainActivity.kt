@@ -455,16 +455,74 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showLibraryPage() {
-        secondaryPage("Your Library", "Search and manage all saved PDFs.", 1) { page ->
-            val files = outputFolder().listFiles { f -> f.isFile && f.extension.equals("pdf", true) }?.sortedByDescending { it.lastModified() }.orEmpty()
-            page.addView(TextView(this).apply { text = files.size.toString() + " PDFs saved"; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(103, 232, 249)); setPadding(0, 0, 0, dp(12)) }, matchWrap())
-            val search = EditText(this).apply { hint = "Search documents"; setSingleLine(true); textSize = 14f; setTextColor(Color.WHITE); setHintTextColor(muted); setPadding(dp(14), dp(12), dp(14), dp(12)); background = rounded(Color.rgb(31, 35, 56), 16) }
-            page.addView(search, matchWrap().apply { bottomMargin = dp(12) })
-            val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; page.addView(list, matchWrap())
-            fun render(q: String) { list.removeAllViews(); val matches = files.filter { it.name.contains(q.trim(), ignoreCase = true) }; if (matches.isEmpty()) list.addView(TextView(this).apply { text = if (files.isEmpty()) "No PDFs yet. Scan a document to start." else "No matching PDFs."; setTextColor(muted); gravity = Gravity.CENTER; setPadding(dp(10), dp(32), dp(10), dp(32)) }, matchWrap()) else matches.forEach { addPdfRow(list, it) } }
+        secondaryPage("Your Library", "Search, sort and manage all saved PDFs.", 1) { page ->
+            val files = outputFolder().listFiles { f -> f.isFile && f.extension.equals("pdf", true) }.orEmpty()
+            var sortMode = 0 // 0 newest, 1 oldest, 2 name, 3 largest
+            val count = files.size
+            val totalBytes = files.sumOf { it.length() }
+            val totalLabel = if (totalBytes >= 1024L * 1024L) String.format("%.1f MB", totalBytes / (1024f * 1024f)) else "${totalBytes / 1024} KB"
+            page.addView(TextView(this).apply {
+                text = "$count PDFs  ·  $totalLabel used"
+                textSize = 15f; typeface = Typeface.DEFAULT_BOLD
+                setTextColor(Color.rgb(103, 232, 249)); setPadding(0, 0, 0, dp(12))
+            }, matchWrap())
+            val search = EditText(this).apply {
+                hint = "Search documents"; setSingleLine(true); textSize = 14f
+                setTextColor(Color.WHITE); setHintTextColor(muted)
+                setPadding(dp(14), dp(12), dp(14), dp(12))
+                background = rounded(Color.rgb(31, 35, 56), 16)
+            }
+            page.addView(search, matchWrap().apply { bottomMargin = dp(8) })
+            val sortButton = Button(this).apply {
+                text = "Sort: Newest first"; isAllCaps = false; textSize = 12f
+                setOnClickListener {
+                    AlertDialog.Builder(this@MainActivity)
+                        .setTitle("Sort PDFs")
+                        .setSingleChoiceItems(arrayOf("Newest first", "Oldest first", "Name A–Z", "Largest first"), sortMode) { dialog, which ->
+                            sortMode = which
+                            text = "Sort: " + arrayOf("Newest first", "Oldest first", "Name A–Z", "Largest first")[which]
+                            renderLibrary(search.text.toString(), sortMode, files, list)
+                            dialog.dismiss()
+                        }.setNegativeButton("Cancel", null).show()
+                }
+            }
+            page.addView(sortButton, matchWrap().apply { bottomMargin = dp(10) })
+            val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            page.addView(list, matchWrap())
+            fun render(q: String) { renderLibrary(q, sortMode, files, list) }
             render("")
-            search.addTextChangedListener(object : TextWatcher { override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}; override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { render(s?.toString().orEmpty()) }; override fun afterTextChanged(s: Editable?) {} })
-            page.addView(TextView(this).apply { text = "+ Scan new document"; textSize = 15f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = rounded(Color.rgb(104, 74, 210), 16); setPadding(dp(16), dp(16), dp(16), dp(16)); setOnClickListener { launchDocumentScanner() } }, matchWrap().apply { topMargin = dp(14) })
+            search.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { render(s?.toString().orEmpty()) }
+                override fun afterTextChanged(s: Editable?) {}
+            })
+            page.addView(TextView(this).apply {
+                text = "+ Scan new document"; textSize = 15f; typeface = Typeface.DEFAULT_BOLD
+                gravity = Gravity.CENTER; setTextColor(Color.WHITE)
+                background = rounded(Color.rgb(104, 74, 210), 16)
+                setPadding(dp(16), dp(16), dp(16), dp(16))
+                setOnClickListener { launchDocumentScanner() }
+            }, matchWrap().apply { topMargin = dp(14) })
+        }
+    }
+
+    private fun renderLibrary(query: String, sortMode: Int, files: List<File>, list: LinearLayout) {
+        list.removeAllViews()
+        val filtered = files.filter { it.name.contains(query.trim(), ignoreCase = true) }
+        val matches = when (sortMode) {
+            1 -> filtered.sortedBy { it.lastModified() }
+            2 -> filtered.sortedBy { it.name.lowercase() }
+            3 -> filtered.sortedByDescending { it.length() }
+            else -> filtered.sortedByDescending { it.lastModified() }
+        }
+        if (matches.isEmpty()) {
+            list.addView(TextView(this).apply {
+                text = if (files.isEmpty()) "No PDFs yet. Scan a document to start." else "No matching PDFs."
+                setTextColor(muted); gravity = Gravity.CENTER
+                setPadding(dp(10), dp(32), dp(10), dp(32))
+            }, matchWrap())
+        } else {
+            matches.forEach { addPdfRow(list, it) }
         }
     }
 
