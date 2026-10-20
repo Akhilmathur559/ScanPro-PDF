@@ -8,13 +8,12 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        // Separate application ID lets v1.5 install beside an older build
-        // signed with a different key, avoiding an uninstall/data-loss step.
-        applicationId = "com.scanpro.pdf.v15"
+        // Restore the original package ID so future releases update the same app.
+        applicationId = "com.scanpro.pdf"
         minSdk = 24
         targetSdk = 35
-        versionCode = 6
-        versionName = "1.5"
+        versionCode = 7
+        versionName = "1.6"
     }
 
     compileOptions {
