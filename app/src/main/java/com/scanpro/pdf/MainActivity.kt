@@ -38,6 +38,7 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.text.PDFTextStripper
 import java.io.File
 import java.io.FileOutputStream
 import java.text.DateFormat
@@ -58,6 +59,14 @@ class MainActivity : AppCompatActivity() {
     }
     private val rotatePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) rotatePdf(uri)
+    }
+
+    private val organizePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) askOrganizePages(uri)
+    }
+
+    private val pdfTextPicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) extractPdfText(uri)
     }
 
     private val imagePicker = registerForActivityResult(
@@ -213,6 +222,10 @@ class MainActivity : AppCompatActivity() {
             tile("↻", "Rotate PDF", "Fix page orientation", cyan) { rotatePicker.launch("application/pdf") },
             tile("▤", "All documents", "Browse your library", violet) { showAllPdfs() }
         )
+        toolRow(
+            tile("⇅", "Organize pages", "Reorder or remove pages", Color.rgb(251, 191, 36)) { organizePicker.launch("application/pdf") },
+            tile("TXT", "PDF to text", "Extract searchable text", Color.rgb(103, 232, 249)) { pdfTextPicker.launch("application/pdf") }
+        )
 
         val saved = outputFolder().listFiles { f -> f.isFile && f.extension.equals("pdf", true) }
             ?.sortedByDescending { it.lastModified() }.orEmpty()
@@ -310,7 +323,7 @@ class MainActivity : AppCompatActivity() {
         nav.addView(navItem("▤", "LIBRARY", false) { showAllPdfs() }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         nav.addView(navItem("✧", "TOOLS", false) {
             AlertDialog.Builder(this@MainActivity).setTitle("PDF Studio")
-                .setItems(arrayOf("Scan document", "Images to PDF", "Text recognition (OCR)", "Merge PDFs", "Split PDF pages", "Rotate PDF pages")) { _, which ->
+                 .setItems(arrayOf("Scan document", "Images to PDF", "Text recognition (OCR)", "Merge PDFs", "Split PDF pages", "Rotate PDF pages", "Organize / reorder pages", "Extract text from PDF")) { _, which ->
                     when (which) {
                         0 -> launchDocumentScanner()
                         1 -> imagePicker.launch("image/*")
@@ -318,6 +331,8 @@ class MainActivity : AppCompatActivity() {
                         3 -> mergePicker.launch("application/pdf")
                         4 -> splitPicker.launch("application/pdf")
                         5 -> rotatePicker.launch("application/pdf")
+                        6 -> organizePicker.launch("application/pdf")
+                        7 -> pdfTextPicker.launch("application/pdf")
                     }
                 }.show()
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
@@ -831,6 +846,87 @@ class MainActivity : AppCompatActivity() {
             }
         } catch (e: Exception) {
             toast("Split failed: ${e.localizedMessage ?: "check page numbers and PDF"}")
+        }
+    }
+
+    private fun askOrganizePages(uri: Uri) {
+        try {
+            val stream = contentResolver.openInputStream(uri)
+                ?: throw IllegalStateException("Could not read selected PDF")
+            val pageCount = stream.use { input ->
+                PDDocument.load(input).use { it.numberOfPages }
+            }
+            if (pageCount < 1) throw IllegalArgumentException("This PDF has no pages")
+            val orderInput = EditText(this).apply {
+                hint = "Example: 3,1,2"
+                setSingleLine(true)
+                setText((1..pageCount).joinToString(","))
+                setSelection(text.length)
+            }
+            AlertDialog.Builder(this)
+                .setTitle("Organize PDF pages")
+                .setMessage("This PDF has $pageCount pages. Enter the page numbers in the order you want. Omit a number to remove that page; repeat a number to duplicate it. Example: 3,1,2")
+                .setView(orderInput)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Create PDF") { _, _ -> organizePdf(uri, orderInput.text.toString(), pageCount) }
+                .show()
+        } catch (e: Exception) {
+            toast("Could not read PDF: ${e.localizedMessage ?: "unknown error"}")
+        }
+    }
+
+    private fun organizePdf(uri: Uri, pageSpec: String, pageCount: Int) {
+        try {
+            val requested = pageSpec.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                .map { it.toIntOrNull() ?: throw IllegalArgumentException("Use page numbers separated by commas") }
+            if (requested.isEmpty()) throw IllegalArgumentException("Enter at least one page number")
+            if (requested.any { it !in 1..pageCount }) throw IllegalArgumentException("Page numbers must be between 1 and $pageCount")
+            contentResolver.openInputStream(uri)?.use { input ->
+                PDDocument.load(input).use { source ->
+                    PDDocument().use { output ->
+                        requested.forEach { output.importPage(source.getPage(it - 1)) }
+                        val folder = outputFolder()
+                        if (!folder.exists()) folder.mkdirs()
+                        val file = File(folder, "ScanPro_Organized_${System.currentTimeMillis()}.pdf")
+                        output.save(file)
+                        toast("Created PDF with ${requested.size} pages")
+                        buildHome()
+                    }
+                }
+            } ?: throw IllegalStateException("Could not read selected PDF")
+        } catch (e: Exception) {
+            toast("Page organization failed: ${e.localizedMessage ?: "check page numbers"}")
+        }
+    }
+
+    private fun extractPdfText(uri: Uri) {
+        try {
+            contentResolver.openInputStream(uri)?.use { input ->
+                PDDocument.load(input).use { document ->
+                    val text = PDFTextStripper().getText(document).trim()
+                    if (text.isBlank()) {
+                        toast("No selectable text found. Scanned PDFs may need OCR.")
+                        return
+                    }
+                    val folder = outputFolder()
+                    if (!folder.exists()) folder.mkdirs()
+                    val file = File(folder, "ScanPro_Text_${System.currentTimeMillis()}.txt")
+                    file.writeText(text, Charsets.UTF_8)
+                    AlertDialog.Builder(this)
+                        .setTitle("Text extracted")
+                        .setMessage("Saved extracted text to ${file.name}.\n\n" + text.take(1800) + if (text.length > 1800) "\n…" else "")
+                        .setPositiveButton("Done", null)
+                        .setNeutralButton("Copy all") { _, _ ->
+                            val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+                            clipboard.setPrimaryClip(ClipData.newPlainText("PDF text", text))
+                            toast("Extracted text copied")
+                        }
+                        .show()
+                    toast("Text saved as ${file.name}")
+                }
+            } ?: throw IllegalStateException("Could not read selected PDF")
+        } catch (e: Exception) {
+            toast("Text extraction failed: ${e.localizedMessage ?: "unsupported or damaged PDF"}")
         }
     }
 
