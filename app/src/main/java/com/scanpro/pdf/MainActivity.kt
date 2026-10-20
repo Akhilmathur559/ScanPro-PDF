@@ -18,6 +18,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -551,6 +552,128 @@ class MainActivity : AppCompatActivity() {
                 .addOnCompleteListener { recognizer.close() }
         } catch (e: Exception) {
             toast("Could not open image: ${e.localizedMessage ?: "unknown error"}")
+        }
+    }
+
+    private fun mergePdfs(uris: List<Uri>) {
+        try {
+            val output = PDDocument()
+            var addedPages = 0
+            try {
+                uris.forEach { uri ->
+                    val input = contentResolver.openInputStream(uri)
+                        ?: throw IllegalStateException("Could not read one selected PDF")
+                    input.use { stream ->
+                        val source = PDDocument.load(stream)
+                        try {
+                            for (pageIndex in 0 until source.numberOfPages) {
+                                output.importPage(source.getPage(pageIndex))
+                                addedPages++
+                            }
+                        } finally {
+                            source.close()
+                        }
+                    }
+                }
+                if (addedPages == 0) throw IllegalStateException("Selected PDFs contain no pages")
+                val folder = outputFolder()
+                if (!folder.exists()) folder.mkdirs()
+                val file = File(folder, "ScanPro_Merged_${System.currentTimeMillis()}.pdf")
+                output.save(file)
+                toast("Merged $addedPages pages: ${file.name}")
+                buildHome()
+            } finally {
+                output.close()
+            }
+        } catch (e: Exception) {
+            toast("Merge failed: ${e.localizedMessage ?: "unsupported or damaged PDF"}")
+        }
+    }
+
+    private fun askSplitPages(uri: Uri) {
+        val input = EditText(this).apply {
+            hint = "Example: 1-3 or 2,4,6"
+            setSingleLine(true)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Split / extract pages")
+            .setMessage("Enter page numbers or ranges. Example: 1-3,5")
+            .setView(input)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Create PDF") { _, _ -> splitPdf(uri, input.text.toString()) }
+            .show()
+    }
+
+    private fun splitPdf(uri: Uri, pageSpec: String) {
+        try {
+            val stream = contentResolver.openInputStream(uri)
+                ?: throw IllegalStateException("Could not read selected PDF")
+            stream.use { input ->
+                val source = PDDocument.load(input)
+                try {
+                    val selected = linkedSetOf<Int>()
+                    pageSpec.split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { part ->
+                        if (part.contains("-")) {
+                            val bits = part.split("-", limit = 2)
+                            val start = bits[0].trim().toInt()
+                            val end = bits[1].trim().toInt()
+                            if (start < 1 || end < start || end > source.numberOfPages) {
+                                throw IllegalArgumentException("Page range $part is outside 1-${source.numberOfPages}")
+                            }
+                            for (page in start..end) selected.add(page)
+                        } else {
+                            val page = part.toInt()
+                            if (page < 1 || page > source.numberOfPages) {
+                                throw IllegalArgumentException("Page $page is outside 1-${source.numberOfPages}")
+                            }
+                            selected.add(page)
+                        }
+                    }
+                    if (selected.isEmpty()) throw IllegalArgumentException("Enter at least one page number")
+                    val output = PDDocument()
+                    try {
+                        selected.forEach { output.importPage(source.getPage(it - 1)) }
+                        val folder = outputFolder()
+                        if (!folder.exists()) folder.mkdirs()
+                        val file = File(folder, "ScanPro_Pages_${System.currentTimeMillis()}.pdf")
+                        output.save(file)
+                        toast("Saved ${selected.size} page(s): ${file.name}")
+                        buildHome()
+                    } finally {
+                        output.close()
+                    }
+                } finally {
+                    source.close()
+                }
+            }
+        } catch (e: Exception) {
+            toast("Split failed: ${e.localizedMessage ?: "check page numbers and PDF"}")
+        }
+    }
+
+    private fun rotatePdf(uri: Uri) {
+        try {
+            val stream = contentResolver.openInputStream(uri)
+                ?: throw IllegalStateException("Could not read selected PDF")
+            stream.use { input ->
+                val document = PDDocument.load(input)
+                try {
+                    for (index in 0 until document.numberOfPages) {
+                        val page = document.getPage(index)
+                        page.rotation = (page.rotation + 90) % 360
+                    }
+                    val folder = outputFolder()
+                    if (!folder.exists()) folder.mkdirs()
+                    val file = File(folder, "ScanPro_Rotated_${System.currentTimeMillis()}.pdf")
+                    document.save(file)
+                    toast("Rotated all pages: ${file.name}")
+                    buildHome()
+                } finally {
+                    document.close()
+                }
+            }
+        } catch (e: Exception) {
+            toast("Rotate failed: ${e.localizedMessage ?: "unsupported or damaged PDF"}")
         }
     }
 
