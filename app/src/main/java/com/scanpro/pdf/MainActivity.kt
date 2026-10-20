@@ -29,7 +29,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
-import com.google.mlkit.vision.documentscanner.GmsDocumentScanningOptions
+import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
@@ -359,14 +359,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun launchDocumentScanner() {
-        val options = GmsDocumentScanningOptions.Builder()
+        val options = GmsDocumentScannerOptions.Builder()
             .setGalleryImportAllowed(true)
             .setPageLimit(30)
             .setResultFormats(
-                GmsDocumentScanningOptions.RESULT_FORMAT_PDF,
-                GmsDocumentScanningOptions.RESULT_FORMAT_JPEG
+                GmsDocumentScannerOptions.RESULT_FORMAT_PDF,
+                GmsDocumentScannerOptions.RESULT_FORMAT_JPEG
             )
-            .setScannerMode(GmsDocumentScanningOptions.SCANNER_MODE_FULL)
+            .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
             .build()
 
         GmsDocumentScanning.getClient(options)
