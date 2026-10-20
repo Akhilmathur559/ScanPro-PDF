@@ -10,6 +10,8 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.text.TextWatcher
+import android.text.Editable
 import android.graphics.pdf.PdfDocument
 import android.net.Uri
 import android.os.Bundle
@@ -235,7 +237,53 @@ class MainActivity : AppCompatActivity() {
             }
             page.addView(empty, matchWrap())
         } else {
-            saved.take(5).forEach { pdf -> addPdfRow(page, pdf) }
+            val totalBytes = saved.sumOf { it.length() }
+            val stats = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(14), dp(12), dp(14), dp(12)); background = rounded(panel, 16)
+            }
+            fun stat(value: String, caption: String): LinearLayout = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(TextView(this@MainActivity).apply { text = value; textSize = 18f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE) })
+                addView(TextView(this@MainActivity).apply { text = caption; textSize = 10f; setTextColor(muted); setPadding(0, dp(3), 0, 0) })
+            }
+            stats.addView(stat(saved.size.toString(), "PDF FILES"), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            stats.addView(stat(if (totalBytes > 1024 * 1024) String.format("%.1f MB", totalBytes / (1024f * 1024f)) else "${totalBytes / 1024} KB", "SPACE USED"), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            page.addView(stats, matchWrap().apply { bottomMargin = dp(12) })
+            val search = EditText(this).apply {
+                hint = "Search your PDFs..."
+                textSize = 14f
+                setSingleLine(true)
+                setTextColor(Color.WHITE)
+                setHintTextColor(Color.rgb(120, 128, 155))
+                setPadding(dp(16), dp(12), dp(16), dp(12))
+                background = rounded(panelAlt, 16)
+            }
+            page.addView(search, matchWrap().apply { bottomMargin = dp(10) })
+            val fileResults = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+            page.addView(fileResults, matchWrap())
+            fun renderFiles(query: String) {
+                fileResults.removeAllViews()
+                val matches = saved.filter { it.name.contains(query.trim(), ignoreCase = true) }
+                if (matches.isEmpty()) {
+                    fileResults.addView(TextView(this).apply {
+                        text = "No matching PDFs found"
+                        textSize = 13f; setTextColor(muted); gravity = Gravity.CENTER
+                        setPadding(dp(12), dp(22), dp(12), dp(22))
+                    }, matchWrap())
+                } else {
+                    matches.take(5).forEach { pdf -> addPdfRow(fileResults, pdf) }
+                    if (matches.size > 5) {
+                        addTextButton(fileResults, "View all ${matches.size} matching PDFs") { showAllPdfs() }
+                    }
+                }
+            }
+            renderFiles("")
+            search.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { renderFiles(s?.toString().orEmpty()) }
+                override fun afterTextChanged(s: Editable?) {}
+            })
         }
         page.addView(TextView(this).apply {
             text = "PRIVATE BY DESIGN  ·  PROCESSED ON YOUR DEVICE"
