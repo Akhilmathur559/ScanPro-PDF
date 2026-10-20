@@ -321,21 +321,7 @@ class MainActivity : AppCompatActivity() {
             }
         nav.addView(navItem("◈", "HOME", true) { buildHome() }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         nav.addView(navItem("▤", "LIBRARY", false) { showAllPdfs() }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        nav.addView(navItem("✧", "TOOLS", false) {
-            AlertDialog.Builder(this@MainActivity).setTitle("PDF Studio")
-                 .setItems(arrayOf("Scan document", "Images to PDF", "Text recognition (OCR)", "Merge PDFs", "Split PDF pages", "Rotate PDF pages", "Organize / reorder pages", "Extract text from PDF")) { _, which ->
-                    when (which) {
-                        0 -> launchDocumentScanner()
-                        1 -> imagePicker.launch("image/*")
-                        2 -> ocrPicker.launch("image/*")
-                        3 -> mergePicker.launch("application/pdf")
-                        4 -> splitPicker.launch("application/pdf")
-                        5 -> rotatePicker.launch("application/pdf")
-                        6 -> organizePicker.launch("application/pdf")
-                        7 -> pdfTextPicker.launch("application/pdf")
-                    }
-                }.show()
-        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        nav.addView(navItem("✧", "TOOLS", false) { showToolsPage() }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         root.addView(nav, matchWrap().apply { leftMargin = dp(14); rightMargin = dp(14); topMargin = dp(8); bottomMargin = dp(10) })
         setContentView(root)
     }
@@ -448,6 +434,54 @@ class MainActivity : AppCompatActivity() {
         parent.addView(row, matchWrap().apply { bottomMargin = dp(9) })
     }
 
+    private fun showAllPdfs() { showLibraryPage() }
+
+    private fun secondaryPage(title: String, subtitle: String, active: Int, content: (LinearLayout) -> Unit) {
+        val bg = Color.rgb(10, 12, 23)
+        val page = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(24)); setBackgroundColor(bg) }
+        page.addView(TextView(this).apply { text = title; textSize = 28f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE) }, matchWrap())
+        page.addView(TextView(this).apply { text = subtitle; textSize = 13f; setTextColor(muted); setPadding(0, dp(6), 0, dp(20)) }, matchWrap())
+        content(page)
+        val scroll = ScrollView(this).apply { addView(page) }
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(bg) }
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        val nav = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER; setPadding(dp(8), dp(8), dp(8), dp(8)); background = rounded(Color.rgb(23, 27, 44), 22) }
+        fun item(label: String, index: Int, action: () -> Unit) = TextView(this).apply { text = label; gravity = Gravity.CENTER; textSize = 11f; typeface = Typeface.DEFAULT_BOLD; setTextColor(if (active == index) Color.WHITE else muted); if (active == index) background = rounded(Color.rgb(104, 74, 210), 15); setPadding(dp(8), dp(13), dp(8), dp(13)); setOnClickListener { action() } }
+        nav.addView(item("HOME", 0) { buildHome() }, LinearLayout.LayoutParams(0, -2, 1f))
+        nav.addView(item("LIBRARY", 1) { showLibraryPage() }, LinearLayout.LayoutParams(0, -2, 1f))
+        nav.addView(item("TOOLS", 2) { showToolsPage() }, LinearLayout.LayoutParams(0, -2, 1f))
+        root.addView(nav, matchWrap().apply { leftMargin = dp(14); rightMargin = dp(14); topMargin = dp(8); bottomMargin = dp(10) })
+        setContentView(root)
+    }
+
+    private fun showLibraryPage() {
+        secondaryPage("Your Library", "Search and manage all saved PDFs.", 1) { page ->
+            val files = outputFolder().listFiles { f -> f.isFile && f.extension.equals("pdf", true) }?.sortedByDescending { it.lastModified() }.orEmpty()
+            page.addView(TextView(this).apply { text = files.size.toString() + " PDFs saved"; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(103, 232, 249)); setPadding(0, 0, 0, dp(12)) }, matchWrap())
+            val search = EditText(this).apply { hint = "Search documents"; setSingleLine(true); textSize = 14f; setTextColor(Color.WHITE); setHintTextColor(muted); setPadding(dp(14), dp(12), dp(14), dp(12)); background = rounded(Color.rgb(31, 35, 56), 16) }
+            page.addView(search, matchWrap().apply { bottomMargin = dp(12) })
+            val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }; page.addView(list, matchWrap())
+            fun render(q: String) { list.removeAllViews(); val matches = files.filter { it.name.contains(q.trim(), ignoreCase = true) }; if (matches.isEmpty()) list.addView(TextView(this).apply { text = if (files.isEmpty()) "No PDFs yet. Scan a document to start." else "No matching PDFs."; setTextColor(muted); gravity = Gravity.CENTER; setPadding(dp(10), dp(32), dp(10), dp(32)) }, matchWrap()) else matches.forEach { addPdfRow(list, it) } }
+            render("")
+            search.addTextChangedListener(object : TextWatcher { override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}; override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { render(s?.toString().orEmpty()) }; override fun afterTextChanged(s: Editable?) {} })
+            page.addView(TextView(this).apply { text = "+ Scan new document"; textSize = 15f; typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; setTextColor(Color.WHITE); background = rounded(Color.rgb(104, 74, 210), 16); setPadding(dp(16), dp(16), dp(16), dp(16)); setOnClickListener { launchDocumentScanner() } }, matchWrap().apply { topMargin = dp(14) })
+        }
+    }
+
+    private fun showToolsPage() {
+        secondaryPage("PDF Tools", "Choose a tool to get straight to work.", 2) { page ->
+            fun tool(name: String, detail: String, action: () -> Unit) { val card = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(14), dp(16), dp(14)); background = rounded(Color.rgb(23, 27, 44), 18); setOnClickListener { action() } }; card.addView(TextView(this).apply { text = name; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE) }); card.addView(TextView(this).apply { text = detail; textSize = 12f; setTextColor(muted); setPadding(0, dp(5), 0, 0) }); page.addView(card, matchWrap().apply { bottomMargin = dp(10) }) }
+            tool("Scan document", "Auto crop and enhance pages") { launchDocumentScanner() }
+            tool("Images to PDF", "Create a PDF from photos") { imagePicker.launch("image/*") }
+            tool("Text scanner / OCR", "Recognize text from an image") { ocrPicker.launch("image/*") }
+            tool("Merge PDFs", "Combine multiple PDF files") { mergePicker.launch("application/pdf") }
+            tool("Split pages", "Extract selected page ranges") { splitPicker.launch("application/pdf") }
+            tool("Rotate PDF", "Rotate all pages") { rotatePicker.launch("application/pdf") }
+            tool("Organize pages", "Reorder, remove or duplicate pages") { organizePicker.launch("application/pdf") }
+            tool("PDF to text", "Extract text into a TXT file") { pdfTextPicker.launch("application/pdf") }
+            tool("Browse Library", "Search and manage saved PDFs") { showLibraryPage() }
+        }
+    }
     private fun showAllPdfs() {
         val files = outputFolder().listFiles { f -> f.isFile && f.extension.equals("pdf", true) }
             ?.sortedByDescending { it.lastModified() }.orEmpty()
