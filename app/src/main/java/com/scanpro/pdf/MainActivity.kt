@@ -436,15 +436,108 @@ class MainActivity : AppCompatActivity() {
     private fun showAllPdfs() {
         val files = outputFolder().listFiles { f -> f.isFile && f.extension.equals("pdf", true) }
             ?.sortedByDescending { it.lastModified() }.orEmpty()
-        if (files.isEmpty()) {
-            toast("No saved PDFs yet")
-            return
+        val bg = Color.rgb(10, 12, 23)
+        val panel = Color.rgb(23, 27, 44)
+        val violet = Color.rgb(167, 139, 250)
+        val cyan = Color.rgb(103, 232, 249)
+        val shell = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(18), dp(20), dp(12))
+            setBackgroundColor(bg)
         }
+        shell.addView(TextView(this).apply {
+            text = "YOUR LIBRARY"
+            textSize = 11f; letterSpacing = 0.18f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(violet)
+        }, matchWrap())
+        shell.addView(TextView(this).apply {
+            text = "Every file,\\none place."
+            textSize = 27f; typeface = Typeface.create("sans-serif-black", Typeface.NORMAL)
+            setTextColor(Color.WHITE); setPadding(0, dp(7), 0, dp(4))
+        }, matchWrap())
+        shell.addView(TextView(this).apply {
+            text = "${files.size} PDF files · stored privately on this device"
+            textSize = 12f; setTextColor(muted); setPadding(0, 0, 0, dp(16))
+        }, matchWrap())
+        val search = EditText(this).apply {
+            hint = "Search by file name..."
+            textSize = 14f; setSingleLine(true)
+            setTextColor(Color.WHITE); setHintTextColor(Color.rgb(120, 128, 155))
+            setPadding(dp(15), dp(12), dp(15), dp(12))
+            background = rounded(panel, 15)
+        }
+        shell.addView(search, matchWrap().apply { bottomMargin = dp(12) })
+        val list = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val scroller = ScrollView(this).apply { isFillViewport = false; clipToPadding = false }
+        scroller.addView(list)
+        shell.addView(scroller, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(420), 1f))
+
+        fun render(query: String) {
+            list.removeAllViews()
+            val matches = files.filter { it.name.contains(query.trim(), ignoreCase = true) }
+            if (matches.isEmpty()) {
+                list.addView(TextView(this).apply {
+                    text = if (files.isEmpty()) "No PDFs yet. Start by scanning a document." else "No files match that search."
+                    textSize = 14f; gravity = Gravity.CENTER; setTextColor(muted)
+                    setPadding(dp(12), dp(35), dp(12), dp(35))
+                }, matchWrap())
+            } else {
+                matches.forEach { pdf ->
+                    val card = LinearLayout(this).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        setPadding(dp(12), dp(12), dp(12), dp(12))
+                        background = rounded(panel, 17)
+                        setOnClickListener { showPdfOptions(pdf) }
+                    }
+                    card.addView(TextView(this).apply {
+                        text = "PDF"; textSize = 10f; typeface = Typeface.DEFAULT_BOLD
+                        gravity = Gravity.CENTER; setTextColor(violet)
+                        background = rounded(Color.rgb(47, 39, 83), 11)
+                        setPadding(dp(10), dp(14), dp(10), dp(14))
+                    })
+                    val details = LinearLayout(this).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(dp(12), 0, dp(8), 0)
+                    }
+                    details.addView(TextView(this).apply {
+                        text = pdf.name; textSize = 13f; typeface = Typeface.DEFAULT_BOLD
+                        setTextColor(Color.WHITE); maxLines = 1
+                        ellipsize = android.text.TextUtils.TruncateAt.END
+                    })
+                    details.addView(TextView(this).apply {
+                        val date = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(pdf.lastModified()))
+                        val size = if (pdf.length() >= 1024 * 1024) String.format("%.1f MB", pdf.length() / (1024f * 1024f)) else "${pdf.length() / 1024} KB"
+                        text = "$date  ·  $size"; textSize = 11f; setTextColor(muted)
+                        setPadding(0, dp(4), 0, 0)
+                    })
+                    card.addView(details, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                    card.addView(TextView(this).apply {
+                        text = "›"; textSize = 25f; setTextColor(cyan)
+                    })
+                    list.addView(card, matchWrap().apply { bottomMargin = dp(8) })
+                }
+            }
+        }
+        render("")
+        search.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { render(s?.toString().orEmpty()) }
+            override fun afterTextChanged(s: Editable?) {}
+        })
         AlertDialog.Builder(this)
-            .setTitle("Saved PDFs")
-            .setItems(files.map { it.name }.toTypedArray()) { _, which -> showPdfOptions(files[which]) }
+            .setView(shell)
             .setNegativeButton("Close", null)
-            .show()
+            .setPositiveButton("Scan new", null)
+            .create().also { dialog ->
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+                        dialog.dismiss()
+                        launchDocumentScanner()
+                    }
+                }
+                dialog.show()
+            }
     }
 
     private fun showPdfOptions(pdf: File) {
