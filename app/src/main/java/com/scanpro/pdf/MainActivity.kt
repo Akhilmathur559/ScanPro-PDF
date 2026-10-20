@@ -308,29 +308,44 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openPdf(pdf: File) {
+        if (!pdf.exists() || !pdf.isFile || pdf.length() == 0L) {
+            toast("PDF file is missing or empty")
+            return
+        }
         try {
             val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", pdf)
-            val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/pdf")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            startActivity(Intent.createChooser(intent, "Open PDF with"))
-        } catch (_: android.content.ActivityNotFoundException) {
-            toast("No PDF viewer found. Install a PDF reader first.")
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/pdf")
+                clipData = ClipData.newUri(contentResolver, pdf.name, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            val chooser = Intent.createChooser(intent, "Open PDF with")
+            if (intent.resolveActivity(packageManager) == null) {
+                toast("No PDF viewer found. Install a PDF reader, then try again.")
+                return
+            }
+            startActivity(chooser)
         } catch (e: Exception) {
-            toast("Could not open PDF: ${e.localizedMessage ?: "unknown error"}")
+            toast("Could not open PDF: " + (e.localizedMessage ?: e.javaClass.simpleName))
         }
     }
 
     private fun sharePdf(pdf: File) {
+        if (!pdf.exists() || !pdf.isFile || pdf.length() == 0L) {
+            toast("PDF file is missing or empty")
+            return
+        }
         try {
             val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", pdf)
             val intent = Intent(Intent.ACTION_SEND).apply {
                 type = "application/pdf"
                 putExtra(Intent.EXTRA_STREAM, uri)
+                clipData = ClipData.newUri(contentResolver, pdf.name, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
             startActivity(Intent.createChooser(intent, "Share PDF"))
         } catch (e: Exception) {
-            toast("Could not share PDF: ${e.localizedMessage ?: "unknown error"}")
+            toast("Could not share PDF: " + (e.localizedMessage ?: e.javaClass.simpleName))
         }
     }
 
