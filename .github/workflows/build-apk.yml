@@ -21,12 +21,22 @@ jobs:
           java-version: "17"
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-      - name: Restore stable debug signing key
+      - name: Restore signing key cache (fallback only)
+        if: ${{ secrets.SCANPRO_DEBUG_KEYSTORE_BASE64 == '' }}
         uses: actions/cache@v4
         with:
           path: ~/.android/debug.keystore
           key: scanpro-debug-signing-key-v1
-      - name: Ensure stable debug signing key exists
+      - name: Set up persistent signing key from repository secret
+        if: ${{ secrets.SCANPRO_DEBUG_KEYSTORE_BASE64 != '' }}
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SCANPRO_DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          mkdir -p "$HOME/.android"
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+          chmod 600 "$HOME/.android/debug.keystore"
+      - name: Ensure signing key exists
         shell: bash
         run: |
           mkdir -p "$HOME/.android"
