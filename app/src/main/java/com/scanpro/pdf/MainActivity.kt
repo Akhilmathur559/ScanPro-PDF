@@ -10,6 +10,15 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.content.pm.PackageManager
+import android.widget.FrameLayout
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.core.content.ContextCompat
 import android.text.TextWatcher
 import android.text.Editable
 import android.graphics.pdf.PdfDocument
@@ -89,6 +98,10 @@ class MainActivity : AppCompatActivity() {
     ) { uri -> if (uri != null) runOcr(uri) }
 
     private var batchScanMode = false
+    private var cameraProvider: ProcessCameraProvider? = null
+    private var batchCapture: ImageCapture? = null
+    private val liveBatchPages = mutableListOf<ScannedPage>()
+    private var batchCameraRoot: View? = null
 
     private data class ScannedPage(val uri: Uri, var name: String)
 
@@ -654,6 +667,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun launchDocumentScanner(batch: Boolean) {
         batchScanMode = batch
+        if (batch) {
+            liveBatchPages.clear()
+            openContinuousBatchCamera()
+            return
+        }
         val options = GmsDocumentScannerOptions.Builder()
             .setGalleryImportAllowed(true)
             .setPageLimit(if (batch) 30 else 1)
@@ -672,6 +690,120 @@ class MainActivity : AppCompatActivity() {
             .addOnFailureListener { error ->
                 toast("Scanner could not start: " + (error.localizedMessage ?: "check Google Play services"))
             }
+    }
+
+
+    /**
+     * A persistent CameraX preview for batch scans. Unlike the Google document-scanner
+     * UI, the camera stays open between page captures; users never need to press its "+".
+     */
+    private fun openContinuousBatchCamera() {
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(android.Manifest.permission.CAMERA), 721)
+            return
+        }
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.rgb(10, 12, 23))
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+        }
+        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val heading = TextView(this).apply {
+            text = "Batch scan  •  0 pages"
+            textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE)
+        }
+        header.addView(heading, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val close = Button(this).apply {
+            text = "Finish"; isAllCaps = false
+            setOnClickListener {
+                cameraProvider?.unbindAll()
+                batchCapture = null
+                batchCameraRoot = null
+                if (liveBatchPages.isEmpty()) buildHome() else showBatchPreview(liveBatchPages.toList())
+            }
+        }
+        header.addView(close)
+        root.addView(header, matchWrap())
+        root.addView(TextView(this).apply {
+            text = "Keep the camera open. Frame each page and tap Capture; no plus button between pages."
+            textSize = 12f; setTextColor(muted); setPadding(0, dp(6), 0, dp(10))
+        }, matchWrap())
+        val preview = PreviewView(this).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+        }
+        root.addView(preview, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
+            setPadding(0, dp(12), 0, dp(4))
+        }
+        val capture = Button(this).apply {
+            text = "●  Capture page"; isAllCaps = false; textSize = 16f
+            setOnClickListener {
+                val useCase = batchCapture ?: run { toast("Camera is still starting"); return@setOnClickListener }
+                val folder = File(cacheDir, "batch_scan").apply { if (!exists()) mkdirs() }
+                val output = File(folder, "page_${System.currentTimeMillis()}.jpg")
+                val options = ImageCapture.OutputFileOptions.Builder(output).build()
+                isEnabled = false
+                useCase.takePicture(options, ContextCompat.getMainExecutor(this@MainActivity), object : ImageCapture.OnImageSavedCallback {
+                    override fun onImageSaved(result: ImageCapture.OutputFileResults) {
+                        val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", output)
+                        liveBatchPages.add(ScannedPage(uri, "Page_${liveBatchPages.size.plus(1).toString().padStart(2, '0')}"))
+                        heading.text = "Batch scan  •  ${liveBatchPages.size} page(s)"
+                        isEnabled = true
+                        toast("Page ${liveBatchPages.size} captured")
+                    }
+                    override fun onError(exception: ImageCaptureException) {
+                        isEnabled = true
+                        toast("Capture failed: ${exception.message ?: "try again"}")
+                    }
+                })
+            }
+        }
+        controls.addView(capture, LinearLayout.LayoutParams(0, dp(54), 1f).apply { rightMargin = dp(6) })
+        val cancel = Button(this).apply {
+            text = "Cancel"; isAllCaps = false
+            setOnClickListener {
+                cameraProvider?.unbindAll()
+                liveBatchPages.clear()
+                batchCameraRoot = null
+                buildHome()
+            }
+        }
+        controls.addView(cancel)
+        root.addView(controls, matchWrap())
+        batchCameraRoot = root
+        setContentView(root)
+        val providerFuture = ProcessCameraProvider.getInstance(this)
+        providerFuture.addListener({
+            try {
+                val provider = providerFuture.get()
+                cameraProvider = provider
+                val cameraPreview = Preview.Builder().build().also { it.setSurfaceProvider(preview.surfaceProvider) }
+                val imageCapture = ImageCapture.Builder()
+                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                    .setJpegQuality(95)
+                    .build()
+                batchCapture = imageCapture
+                provider.unbindAll()
+                provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, cameraPreview, imageCapture)
+            } catch (e: Exception) {
+                toast("Could not start camera: ${e.localizedMessage ?: "camera unavailable"}")
+                buildHome()
+            }
+        }, ContextCompat.getMainExecutor(this))
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 721) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                openContinuousBatchCamera()
+            } else {
+                toast("Camera permission is required for continuous batch scanning")
+                buildHome()
+            }
+        }
     }
 
     private fun showBatchPreview(pages: List<ScannedPage>) {
