@@ -61,6 +61,10 @@ class MainActivity : AppCompatActivity() {
         if (uri != null) rotatePdf(uri)
     }
 
+    private val optimizePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) optimizePdf(uri)
+    }
+
     private val organizePicker = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) askOrganizePages(uri)
     }
@@ -537,6 +541,7 @@ class MainActivity : AppCompatActivity() {
             tool("Merge PDFs", "Combine multiple PDF files") { mergePicker.launch("application/pdf") }
             tool("Split pages", "Extract selected page ranges") { splitPicker.launch("application/pdf") }
             tool("Rotate PDF", "Rotate all pages") { rotatePicker.launch("application/pdf") }
+            tool("Optimize PDF", "Rewrite PDF and compare file size") { optimizePicker.launch("application/pdf") }
             tool("Organize pages", "Reorder, remove or duplicate pages") { organizePicker.launch("application/pdf") }
             tool("PDF to text", "Extract text into a TXT file") { pdfTextPicker.launch("application/pdf") }
             tool("Browse Library", "Search and manage saved PDFs") { showLibraryPage() }
@@ -928,6 +933,47 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             toast("Text extraction failed: ${e.localizedMessage ?: "unsupported or damaged PDF"}")
         }
+    }
+
+    private fun optimizePdf(uri: Uri) {
+        try {
+            val input = contentResolver.openInputStream(uri)
+                ?: throw IllegalStateException("Could not read selected PDF")
+            val sourceBytes = input.use { stream -> stream.readBytes() }
+            if (sourceBytes.isEmpty()) throw IllegalArgumentException("Selected PDF is empty")
+            PDDocument.load(sourceBytes).use { document ->
+                val folder = outputFolder()
+                if (!folder.exists() && !folder.mkdirs()) {
+                    throw IllegalStateException("Could not create ScanPro folder")
+                }
+                val file = File(folder, "ScanPro_Optimized_${System.currentTimeMillis()}.pdf")
+                document.save(file)
+                val originalSize = sourceBytes.size.toLong()
+                val newSize = file.length()
+                val originalLabel = formatFileSize(originalSize)
+                val newLabel = formatFileSize(newSize)
+                val difference = originalSize - newSize
+                val message = when {
+                    difference > 0L -> "Size reduced by ${formatFileSize(difference)} (${(difference * 100 / originalSize)}%)."
+                    difference < 0L -> "The rewritten PDF is ${formatFileSize(-difference)} larger. This PDF may already be optimized."
+                    else -> "The file size stayed the same."
+                }
+                AlertDialog.Builder(this)
+                    .setTitle("PDF optimization complete")
+                    .setMessage("Original: $originalLabel\nNew file: $newLabel\n\n$message\n\nOriginal file was kept unchanged.")
+                    .setPositiveButton("Done") { _, _ -> buildHome() }
+                    .setNeutralButton("Open new PDF") { _, _ -> openPdf(file) }
+                    .show()
+            }
+        } catch (e: Exception) {
+            toast("PDF optimization failed: ${e.localizedMessage ?: "unsupported or damaged PDF"}")
+        }
+    }
+
+    private fun formatFileSize(bytes: Long): String = when {
+        bytes >= 1024L * 1024L -> String.format("%.2f MB", bytes / (1024f * 1024f))
+        bytes >= 1024L -> String.format("%.1f KB", bytes / 1024f)
+        else -> "$bytes B"
     }
 
     private fun rotatePdf(uri: Uri) {
