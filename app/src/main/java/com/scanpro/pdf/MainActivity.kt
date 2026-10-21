@@ -936,22 +936,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun optimizePdf(uri: Uri) {
+        val tempInput = File(cacheDir, "scanpro_optimize_input_${System.currentTimeMillis()}.pdf")
         try {
             val input = contentResolver.openInputStream(uri)
                 ?: throw IllegalStateException("Could not read selected PDF")
-            val sourceBytes = input.use { stream -> stream.readBytes() }
-            if (sourceBytes.isEmpty()) throw IllegalArgumentException("Selected PDF is empty")
-            PDDocument.load(sourceBytes).use { document ->
+            input.use { source -> FileOutputStream(tempInput).use { output -> source.copyTo(output) } }
+            if (tempInput.length() == 0L) throw IllegalArgumentException("Selected PDF is empty")
+            PDDocument.load(tempInput).use { document ->
                 val folder = outputFolder()
                 if (!folder.exists() && !folder.mkdirs()) {
                     throw IllegalStateException("Could not create ScanPro folder")
                 }
                 val file = File(folder, "ScanPro_Optimized_${System.currentTimeMillis()}.pdf")
                 document.save(file)
-                val originalSize = sourceBytes.size.toLong()
+                val originalSize = tempInput.length()
                 val newSize = file.length()
-                val originalLabel = formatFileSize(originalSize)
-                val newLabel = formatFileSize(newSize)
                 val difference = originalSize - newSize
                 val message = when {
                     difference > 0L -> "Size reduced by ${formatFileSize(difference)} (${(difference * 100 / originalSize)}%)."
@@ -960,13 +959,15 @@ class MainActivity : AppCompatActivity() {
                 }
                 AlertDialog.Builder(this)
                     .setTitle("PDF optimization complete")
-                    .setMessage("Original: $originalLabel\nNew file: $newLabel\n\n$message\n\nOriginal file was kept unchanged.")
+                    .setMessage("Original: ${formatFileSize(originalSize)}\nNew file: ${formatFileSize(newSize)}\n\n$message\n\nOriginal file was kept unchanged.")
                     .setPositiveButton("Done") { _, _ -> buildHome() }
                     .setNeutralButton("Open new PDF") { _, _ -> openPdf(file) }
                     .show()
             }
         } catch (e: Exception) {
             toast("PDF optimization failed: ${e.localizedMessage ?: "unsupported or damaged PDF"}")
+        } finally {
+            tempInput.delete()
         }
     }
 
