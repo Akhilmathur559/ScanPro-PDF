@@ -545,7 +545,7 @@ class MainActivity : AppCompatActivity() {
     private fun showToolsPage() {
         secondaryPage("PDF Tools", "Choose a tool to get straight to work.", 2) { page ->
             fun tool(name: String, detail: String, action: () -> Unit) { val card = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(14), dp(16), dp(14)); background = rounded(Color.rgb(23, 27, 44), 18); setOnClickListener { action() } }; card.addView(TextView(this).apply { text = name; textSize = 16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE) }); card.addView(TextView(this).apply { text = detail; textSize = 12f; setTextColor(muted); setPadding(0, dp(5), 0, 0) }); page.addView(card, matchWrap().apply { bottomMargin = dp(10) }) }
-            tool("Scan document", "Auto crop and enhance pages") { launchDocumentScanner() }
+            tool("Scan document", "Choose single or batch scanning") { showScanModeChooser() }
             tool("Images to PDF", "Create a PDF from photos") { imagePicker.launch("image/*") }
             tool("Text scanner / OCR", "Recognize text from an image") { ocrPicker.launch("image/*") }
             tool("Merge PDFs", "Combine multiple PDF files") { mergePicker.launch("application/pdf") }
@@ -725,7 +725,11 @@ class MainActivity : AppCompatActivity() {
                         isAllCaps = false
                         textSize = 11f
                         setOnClickListener {
-                            item.name = name.text.toString().trim().ifBlank { item.name }
+                            items.forEachIndexed { rowIndex, rowItem ->
+                                val visibleRow = content.getChildAt(rowIndex + 1) as? LinearLayout
+                                val visibleName = visibleRow?.getChildAt(1) as? EditText
+                                visibleName?.text?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let { rowItem.name = it }
+                            }
                             action()
                         }
                     }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { rightMargin = dp(4) })
