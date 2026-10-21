@@ -791,7 +791,7 @@ class MainActivity : AppCompatActivity() {
         mode("Single", false) {
             cameraProvider?.unbindAll()
             batchScanMode = false
-            launchDocumentScanner()
+            launchDocumentScanner(false)
         }
         mode("Batch", true) { }
         mode("ID Card", false) {
