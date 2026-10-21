@@ -731,6 +731,19 @@ class MainActivity : AppCompatActivity() {
                             val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
                             clipboard.setPrimaryClip(ClipData.newPlainText("Recognized text", text))
                             toast("Text copied")
+                        }
+                        .setNegativeButton("Save TXT") { _, _ ->
+                            try {
+                                val folder = outputFolder()
+                                if (!folder.exists() && !folder.mkdirs()) {
+                                    throw IllegalStateException("Could not create ScanPro folder")
+                                }
+                                val file = File(folder, "ScanPro_OCR_${System.currentTimeMillis()}.txt")
+                                file.writeText(text, Charsets.UTF_8)
+                                toast("OCR text saved: ${file.name}")
+                            } catch (e: Exception) {
+                                toast("Could not save text: ${e.localizedMessage ?: "unknown error"}")
+                            }
                         }.show()
                 }
                 .addOnFailureListener { e -> toast("OCR failed: ${e.localizedMessage ?: "unknown error"}") }
