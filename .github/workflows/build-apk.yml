@@ -21,21 +21,23 @@ jobs:
           java-version: "17"
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-      - name: Restore signing key cache (fallback only)
-        if: ${{ secrets.SCANPRO_DEBUG_KEYSTORE_BASE64 == '' }}
+      - name: Restore signing key cache (fallback)
         uses: actions/cache@v4
         with:
           path: ~/.android/debug.keystore
           key: scanpro-debug-signing-key-v1
-      - name: Set up persistent signing key from repository secret
-        if: ${{ secrets.SCANPRO_DEBUG_KEYSTORE_BASE64 != '' }}
+      - name: Use persistent signing key secret when configured
         shell: bash
         env:
           KEYSTORE_BASE64: ${{ secrets.SCANPRO_DEBUG_KEYSTORE_BASE64 }}
         run: |
-          mkdir -p "$HOME/.android"
-          echo "$KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
-          chmod 600 "$HOME/.android/debug.keystore"
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            mkdir -p "$HOME/.android"
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/debug.keystore"
+            chmod 600 "$HOME/.android/debug.keystore"
+          else
+            echo "Persistent signing secret not configured; using cached fallback key."
+          fi
       - name: Ensure signing key exists
         shell: bash
         run: |
