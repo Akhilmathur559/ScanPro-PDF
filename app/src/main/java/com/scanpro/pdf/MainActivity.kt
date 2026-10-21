@@ -725,7 +725,7 @@ class MainActivity : AppCompatActivity() {
         header.addView(close)
         root.addView(header, matchWrap())
         root.addView(TextView(this).apply {
-            text = "Keep the camera open. Frame each page and tap Capture; no plus button between pages."
+            text = "Frame the full page inside the view, avoid shadows, and tap Capture. Page edges are detected and perspective-corrected after capture when clear."
             textSize = 12f; setTextColor(muted); setPadding(0, dp(6), 0, dp(10))
         }, matchWrap())
         val preview = PreviewView(this).apply {
@@ -747,11 +747,18 @@ class MainActivity : AppCompatActivity() {
                 isEnabled = false
                 useCase.takePicture(options, ContextCompat.getMainExecutor(this@MainActivity), object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(result: ImageCapture.OutputFileResults) {
-                        val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", output)
-                        liveBatchPages.add(ScannedPage(uri, "Page_${liveBatchPages.size.plus(1).toString().padStart(2, '0')}"))
-                        heading.text = "Batch scan  •  ${liveBatchPages.size} page(s)"
-                        isEnabled = true
-                        toast("Page ${liveBatchPages.size} captured")
+                        text = "Processing page…"
+                        Thread {
+                            val processedFile = DocumentImageProcessor.process(output)
+                            runOnUiThread {
+                                val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", processedFile)
+                                liveBatchPages.add(ScannedPage(uri, "Page_${liveBatchPages.size.plus(1).toString().padStart(2, '0')}"))
+                                heading.text = "Batch scan  •  ${liveBatchPages.size} page(s)"
+                                text = "●  Capture page"
+                                isEnabled = true
+                                toast(if (processedFile != output) "Page ${liveBatchPages.size} captured and auto-cropped" else "Page ${liveBatchPages.size} captured; no clear page boundary found, original kept")
+                            }
+                        }.start()
                     }
                     override fun onError(exception: ImageCaptureException) {
                         isEnabled = true
