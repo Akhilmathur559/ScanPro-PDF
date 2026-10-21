@@ -833,6 +833,8 @@ class MainActivity : AppCompatActivity() {
             text = "●"
             textSize = 38f
             gravity = Gravity.CENTER
+            isEnabled = false
+            alpha = 0.55f
             setTextColor(Color.WHITE)
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
@@ -840,7 +842,10 @@ class MainActivity : AppCompatActivity() {
                 setStroke(dp(5), accent)
             }
             setOnClickListener {
-                val useCase = batchCapture ?: run { toast("Camera is still starting"); return@setOnClickListener }
+                val useCase = batchCapture ?: run {
+                    toast("Camera abhi ready ho rahi hai—ek second ruk kar try karo")
+                    return@setOnClickListener
+                }
                 val folder = File(cacheDir, "batch_scan").apply { if (!exists()) mkdirs() }
                 val output = File(folder, "page_${System.currentTimeMillis()}.jpg")
                 val options = ImageCapture.OutputFileOptions.Builder(output).build()
@@ -929,7 +934,10 @@ class MainActivity : AppCompatActivity() {
                 analysis.setAnalyzer(analysisExecutor, analyzer)
                 provider.unbindAll()
                 provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, cameraPreview, imageCapture, analysis)
+                capture.isEnabled = true
+                capture.alpha = 1f
             } catch (e: Exception) {
+                batchCapture = null
                 toast("Could not start camera: ${e.localizedMessage ?: "camera unavailable"}")
                 buildHome()
             }
