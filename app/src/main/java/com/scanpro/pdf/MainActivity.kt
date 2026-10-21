@@ -708,35 +708,58 @@ class MainActivity : AppCompatActivity() {
             requestPermissions(arrayOf(android.Manifest.permission.CAMERA), 721)
             return
         }
+        val black = Color.BLACK
+        val accent = Color.rgb(20, 190, 169)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(10, 12, 23))
-            setPadding(dp(12), dp(12), dp(12), dp(12))
+            setBackgroundColor(black)
+            fitsSystemWindows = false
         }
-        val header = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val toolbar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(10), dp(8), dp(10), dp(8))
+            setBackgroundColor(black)
+        }
+        fun tool(label: String, action: () -> Unit): TextView = TextView(this).apply {
+            text = label
+            textSize = 23f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            setOnClickListener { action() }
+        }
+        toolbar.addView(tool("×") {
+            cameraProvider?.unbindAll()
+            if (liveBatchPages.isEmpty()) buildHome() else showBatchPreview(liveBatchPages.toList())
+        }, LinearLayout.LayoutParams(dp(48), dp(46)))
+        toolbar.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
+        val flash = tool("ϟ") { toast("Flash control will be added next") }
+        toolbar.addView(flash, LinearLayout.LayoutParams(dp(44), dp(46)))
+        toolbar.addView(tool("✧") { toast("Scan enhancement is applied after capture") }, LinearLayout.LayoutParams(dp(44), dp(46)))
+        toolbar.addView(tool("HD") { toast("High-quality capture is enabled") }, LinearLayout.LayoutParams(dp(48), dp(46)))
+        toolbar.addView(tool("⋮") {
+            AlertDialog.Builder(this)
+                .setItems(arrayOf("Finish batch", "Cancel batch", "Scan tips")) { _, which ->
+                    when (which) {
+                        0 -> { cameraProvider?.unbindAll(); if (liveBatchPages.isEmpty()) buildHome() else showBatchPreview(liveBatchPages.toList()) }
+                        1 -> { cameraProvider?.unbindAll(); liveBatchPages.clear(); buildHome() }
+                        2 -> toast("Keep the full page in view and use even lighting")
+                    }
+                }.show()
+        }, LinearLayout.LayoutParams(dp(40), dp(46)))
+        root.addView(toolbar, matchWrap())
+
         val heading = TextView(this).apply {
-            text = "Batch scan  •  0 pages"
-            textSize = 17f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.WHITE)
+            text = "BATCH  •  0 PAGES"
+            textSize = 12f
+            letterSpacing = .08f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setPadding(0, dp(2), 0, dp(7))
         }
-        header.addView(heading, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        val close = Button(this).apply {
-            text = "Finish"; isAllCaps = false
-            setOnClickListener {
-                cameraProvider?.unbindAll()
-                batchCapture = null
-                batchAnalysis = null
-                liveAnalyzer = null
-                cornerOverlay = null
-                batchCameraRoot = null
-                if (liveBatchPages.isEmpty()) buildHome() else showBatchPreview(liveBatchPages.toList())
-            }
-        }
-        header.addView(close)
-        root.addView(header, matchWrap())
-        root.addView(TextView(this).apply {
-            text = "Frame the full page inside the view, avoid shadows, and tap Capture. Page edges are detected and perspective-corrected after capture when clear."
-            textSize = 12f; setTextColor(muted); setPadding(0, dp(6), 0, dp(10))
-        }, matchWrap())
+        root.addView(heading, matchWrap())
+
         val preview = PreviewView(this).apply {
             scaleType = PreviewView.ScaleType.FILL_CENTER
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
@@ -747,55 +770,140 @@ class MainActivity : AppCompatActivity() {
         cornerOverlay = overlay
         previewFrame.addView(overlay, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
         root.addView(previewFrame, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        val controls = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
-            setPadding(0, dp(12), 0, dp(4))
+
+        val modeRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(dp(4), dp(7), dp(4), dp(3))
+            setBackgroundColor(black)
         }
-        val capture = Button(this).apply {
-            text = "●  Capture page"; isAllCaps = false; textSize = 16f
+        fun mode(label: String, selected: Boolean, action: () -> Unit) {
+            modeRow.addView(TextView(this).apply {
+                text = label
+                textSize = 13f
+                gravity = Gravity.CENTER
+                typeface = if (selected) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+                setTextColor(if (selected) accent else Color.LTGRAY)
+                setPadding(dp(12), dp(9), dp(12), dp(9))
+                setOnClickListener { action() }
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        }
+        mode("Single", false) {
+            cameraProvider?.unbindAll()
+            batchScanMode = false
+            launchDocumentScanner()
+        }
+        mode("Batch", true) { }
+        mode("ID Card", false) {
+            toast("ID Card mode is coming next; use Batch for now")
+        }
+        root.addView(modeRow, matchWrap())
+
+        val controls = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(8), dp(3), dp(8), dp(9))
+            setBackgroundColor(black)
+        }
+        fun sideAction(label: String, action: () -> Unit): LinearLayout {
+            return LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER
+                setPadding(dp(2), dp(3), dp(2), dp(3))
+                setOnClickListener { action() }
+                addView(TextView(this@MainActivity).apply {
+                    text = if (label == "All Features") "▦" else if (label == "Import Images") "▧" else "▤"
+                    textSize = 23f
+                    gravity = Gravity.CENTER
+                    setTextColor(Color.WHITE)
+                }, matchWrap())
+                addView(TextView(this@MainActivity).apply {
+                    text = label
+                    textSize = 10f
+                    gravity = Gravity.CENTER
+                    setTextColor(Color.WHITE)
+                }, matchWrap())
+            }
+        }
+        controls.addView(sideAction("All Features") {
+            cameraProvider?.unbindAll()
+            buildHome()
+        }, LinearLayout.LayoutParams(0, dp(64), 1f))
+        val capture = TextView(this).apply {
+            text = "●"
+            textSize = 38f
+            gravity = Gravity.CENTER
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.rgb(245, 245, 245))
+                setStroke(dp(5), accent)
+            }
             setOnClickListener {
                 val useCase = batchCapture ?: run { toast("Camera is still starting"); return@setOnClickListener }
                 val folder = File(cacheDir, "batch_scan").apply { if (!exists()) mkdirs() }
                 val output = File(folder, "page_${System.currentTimeMillis()}.jpg")
                 val options = ImageCapture.OutputFileOptions.Builder(output).build()
                 isEnabled = false
+                val oldText = text
+                text = "…"
                 useCase.takePicture(options, ContextCompat.getMainExecutor(this@MainActivity), object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(result: ImageCapture.OutputFileResults) {
-                        text = "Processing page…"
+                        text = oldText
                         Thread {
                             val processedFile = DocumentImageProcessor.process(output)
                             runOnUiThread {
                                 val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", processedFile)
                                 liveBatchPages.add(ScannedPage(uri, "Page_${liveBatchPages.size.plus(1).toString().padStart(2, '0')}"))
-                                heading.text = "Batch scan  •  ${liveBatchPages.size} page(s)"
-                                text = "●  Capture page"
+                                heading.text = "BATCH  •  ${liveBatchPages.size} PAGES"
                                 isEnabled = true
-                                toast(if (processedFile != output) "Page ${liveBatchPages.size} captured and auto-cropped" else "Page ${liveBatchPages.size} captured; no clear page boundary found, original kept")
+                                toast("Page ${liveBatchPages.size} captured")
                             }
                         }.start()
                     }
                     override fun onError(exception: ImageCaptureException) {
+                        text = oldText
                         isEnabled = true
                         toast("Capture failed: ${exception.message ?: "try again"}")
                     }
                 })
             }
         }
-        controls.addView(capture, LinearLayout.LayoutParams(0, dp(54), 1f).apply { rightMargin = dp(6) })
-        val cancel = Button(this).apply {
-            text = "Cancel"; isAllCaps = false
+        controls.addView(capture, LinearLayout.LayoutParams(dp(84), dp(84)).apply { leftMargin = dp(2); rightMargin = dp(2) })
+        controls.addView(sideAction("Import Images") {
+            cameraProvider?.unbindAll()
+            imagePicker.launch("image/*")
+        }, LinearLayout.LayoutParams(0, dp(64), 1f))
+        controls.addView(sideAction("Import Files") {
+            cameraProvider?.unbindAll()
+            mergePicker.launch("application/pdf")
+        }, LinearLayout.LayoutParams(0, dp(64), 1f))
+        root.addView(controls, matchWrap())
+
+        val finishRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, dp(5))
+            setBackgroundColor(black)
+        }
+        finishRow.addView(TextView(this).apply {
+            text = "Finish batch  •  ${liveBatchPages.size} page(s)"
+            textSize = 12f
+            setTextColor(if (liveBatchPages.isEmpty()) Color.GRAY else accent)
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(5), dp(12), dp(5))
             setOnClickListener {
                 cameraProvider?.unbindAll()
+                batchCapture = null
                 batchAnalysis = null
                 liveAnalyzer = null
                 cornerOverlay = null
-                liveBatchPages.clear()
                 batchCameraRoot = null
-                buildHome()
+                if (liveBatchPages.isEmpty()) buildHome() else showBatchPreview(liveBatchPages.toList())
             }
-        }
-        controls.addView(cancel)
-        root.addView(controls, matchWrap())
+        }, matchWrap())
+        root.addView(finishRow, matchWrap())
+
         batchCameraRoot = root
         setContentView(root)
         val providerFuture = ProcessCameraProvider.getInstance(this)
