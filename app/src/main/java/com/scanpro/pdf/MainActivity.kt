@@ -14,6 +14,7 @@ import android.content.pm.PackageManager
 import android.widget.FrameLayout
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
@@ -51,6 +52,7 @@ import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import java.io.File
 import java.io.FileOutputStream
+import java.util.concurrent.Executors
 import java.text.DateFormat
 import java.util.Date
 import kotlin.math.min
@@ -100,6 +102,10 @@ class MainActivity : AppCompatActivity() {
     private var batchScanMode = false
     private var cameraProvider: ProcessCameraProvider? = null
     private var batchCapture: ImageCapture? = null
+    private var batchAnalysis: ImageAnalysis? = null
+    private var liveAnalyzer: LiveDocumentAnalyzer? = null
+    private var cornerOverlay: DocumentCornerOverlay? = null
+    private val analysisExecutor = Executors.newSingleThreadExecutor()
     private val liveBatchPages = mutableListOf<ScannedPage>()
     private var batchCameraRoot: View? = null
 
@@ -718,6 +724,9 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener {
                 cameraProvider?.unbindAll()
                 batchCapture = null
+                batchAnalysis = null
+                liveAnalyzer = null
+                cornerOverlay = null
                 batchCameraRoot = null
                 if (liveBatchPages.isEmpty()) buildHome() else showBatchPreview(liveBatchPages.toList())
             }
@@ -732,7 +741,12 @@ class MainActivity : AppCompatActivity() {
             scaleType = PreviewView.ScaleType.FILL_CENTER
             implementationMode = PreviewView.ImplementationMode.COMPATIBLE
         }
-        root.addView(preview, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        val previewFrame = FrameLayout(this)
+        previewFrame.addView(preview, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        val overlay = DocumentCornerOverlay(this)
+        cornerOverlay = overlay
+        previewFrame.addView(overlay, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        root.addView(previewFrame, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         val controls = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER
             setPadding(0, dp(12), 0, dp(4))
@@ -772,6 +786,9 @@ class MainActivity : AppCompatActivity() {
             text = "Cancel"; isAllCaps = false
             setOnClickListener {
                 cameraProvider?.unbindAll()
+                batchAnalysis = null
+                liveAnalyzer = null
+                cornerOverlay = null
                 liveBatchPages.clear()
                 batchCameraRoot = null
                 buildHome()
@@ -792,8 +809,18 @@ class MainActivity : AppCompatActivity() {
                     .setJpegQuality(95)
                     .build()
                 batchCapture = imageCapture
+                val analysis = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setTargetResolution(android.util.Size(640, 480))
+                    .build()
+                val analyzer = LiveDocumentAnalyzer { corners ->
+                    runOnUiThread { cornerOverlay?.updateCorners(corners) }
+                }
+                liveAnalyzer = analyzer
+                batchAnalysis = analysis
+                analysis.setAnalyzer(analysisExecutor, analyzer)
                 provider.unbindAll()
-                provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, cameraPreview, imageCapture)
+                provider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, cameraPreview, imageCapture, analysis)
             } catch (e: Exception) {
                 toast("Could not start camera: ${e.localizedMessage ?: "camera unavailable"}")
                 buildHome()
