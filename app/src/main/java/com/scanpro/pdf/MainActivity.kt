@@ -861,6 +861,8 @@ class MainActivity : AppCompatActivity() {
                                 val uri = FileProvider.getUriForFile(this@MainActivity, "$packageName.fileprovider", processedFile)
                                 liveBatchPages.add(ScannedPage(uri, "Page_${liveBatchPages.size.plus(1).toString().padStart(2, '0')}"))
                                 heading.text = "BATCH  •  ${liveBatchPages.size} PAGES"
+                                finishButton.text = "Finish batch  •  ${liveBatchPages.size} page(s)"
+                                finishButton.setTextColor(accent)
                                 isEnabled = true
                                 toast("Page ${liveBatchPages.size} captured")
                             }
@@ -891,7 +893,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, 0, 0, dp(5))
             setBackgroundColor(black)
         }
-        finishRow.addView(TextView(this).apply {
+        val finishButton = TextView(this).apply {
             text = "Finish batch  •  ${liveBatchPages.size} page(s)"
             textSize = 12f
             setTextColor(if (liveBatchPages.isEmpty()) Color.GRAY else accent)
@@ -906,7 +908,8 @@ class MainActivity : AppCompatActivity() {
                 batchCameraRoot = null
                 if (liveBatchPages.isEmpty()) buildHome() else showBatchPreview(liveBatchPages.toList())
             }
-        }, matchWrap())
+        }
+        finishRow.addView(finishButton, matchWrap())
         root.addView(finishRow, matchWrap())
 
         batchCameraRoot = root
