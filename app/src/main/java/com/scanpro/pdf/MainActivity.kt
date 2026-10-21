@@ -23,6 +23,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
@@ -87,16 +88,25 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.GetContent()
     ) { uri -> if (uri != null) runOcr(uri) }
 
+    private var batchScanMode = false
+
+    private data class ScannedPage(val uri: Uri, var name: String)
+
     private val scannerLauncher = registerForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) {
             val scanResult = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
-            val pdfUri = scanResult?.pdf?.uri
-            if (pdfUri != null) {
-                saveScannedPdf(pdfUri)
+            val pages = scanResult?.pages.orEmpty().mapIndexedNotNull { index, page ->
+                page.imageUri?.let { ScannedPage(it, "Page_${(index + 1).toString().padStart(2, '0')}") }
+            }
+            if (batchScanMode && pages.isNotEmpty()) {
+                showBatchPreview(pages)
             } else {
-                toast("Scan completed, but no PDF was returned")
+                val pdfUri = scanResult?.pdf?.uri
+                if (pdfUri != null) saveScannedPdf(pdfUri)
+                else if (pages.isNotEmpty()) showBatchPreview(pages)
+                else toast("Scan completed, but no page images or PDF were returned")
             }
         } else if (result.resultCode != RESULT_CANCELED) {
             toast("Document scan could not be completed")
@@ -175,7 +185,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(18), dp(20), dp(14), dp(20))
             background = GradientDrawable(GradientDrawable.Orientation.TL_BR, intArrayOf(Color.rgb(109, 40, 217), Color.rgb(67, 56, 202), Color.rgb(37, 99, 235))).apply { cornerRadius = dp(25).toFloat() }
             elevation = dp(5).toFloat()
-            setOnClickListener { launchDocumentScanner() }
+            setOnClickListener { showScanModeChooser() }
         }
         val scanCopy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         scanCopy.addView(TextView(this).apply { text = "✦  QUICK CAPTURE"; textSize = 10f; letterSpacing = 0.16f; typeface = Typeface.DEFAULT_BOLD; setTextColor(Color.rgb(221, 214, 254)) })
@@ -507,7 +517,7 @@ class MainActivity : AppCompatActivity() {
                 gravity = Gravity.CENTER; setTextColor(Color.WHITE)
                 background = rounded(Color.rgb(104, 74, 210), 16)
                 setPadding(dp(16), dp(16), dp(16), dp(16))
-                setOnClickListener { launchDocumentScanner() }
+                setOnClickListener { showScanModeChooser() }
             }, matchWrap().apply { topMargin = dp(14) })
         }
     }
@@ -633,10 +643,20 @@ class MainActivity : AppCompatActivity() {
             }.show()
     }
 
-    private fun launchDocumentScanner() {
+    private fun showScanModeChooser() {
+        AlertDialog.Builder(this)
+            .setTitle("Choose scan mode")
+            .setMessage("Single Document: scan one page/document. Batch Document: scan multiple pages, then review and export.")
+            .setNegativeButton("Single Document") { _, _ -> launchDocumentScanner(false) }
+            .setPositiveButton("Batch Document") { _, _ -> launchDocumentScanner(true) }
+            .show()
+    }
+
+    private fun launchDocumentScanner(batch: Boolean) {
+        batchScanMode = batch
         val options = GmsDocumentScannerOptions.Builder()
             .setGalleryImportAllowed(true)
-            .setPageLimit(30)
+            .setPageLimit(if (batch) 30 else 1)
             .setResultFormats(
                 GmsDocumentScannerOptions.RESULT_FORMAT_PDF,
                 GmsDocumentScannerOptions.RESULT_FORMAT_JPEG
@@ -652,6 +672,274 @@ class MainActivity : AppCompatActivity() {
             .addOnFailureListener { error ->
                 toast("Scanner could not start: " + (error.localizedMessage ?: "check Google Play services"))
             }
+    }
+
+    private fun showBatchPreview(pages: List<ScannedPage>) {
+        val items = pages.toMutableList()
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(8), dp(16), dp(8))
+        }
+        val scroller = ScrollView(this).apply { addView(content) }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Review ${items.size} scanned page(s)")
+            .setView(scroller)
+            .setNegativeButton("Cancel", null)
+            .setNeutralButton("Save options", null)
+            .setPositiveButton("ZIP: individual PDFs", null)
+            .create()
+
+        fun renderRows() {
+            content.removeAllViews()
+            content.addView(TextView(this).apply {
+                text = "Rename pages, move them up/down, or remove pages. ZIP export creates one PDF per page only—no combined PDF and no JPEG."
+                textSize = 13f
+                setTextColor(muted)
+                setPadding(0, 0, 0, dp(12))
+            }, matchWrap())
+            items.forEachIndexed { index, item ->
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(10), dp(10), dp(10), dp(10))
+                    background = rounded(Color.rgb(25, 29, 47), 14)
+                }
+                val name = EditText(this).apply {
+                    setText(item.name)
+                    hint = "Page file name"
+                    setSingleLine(true)
+                    textSize = 14f
+                    setTextColor(Color.WHITE)
+                    setHintTextColor(muted)
+                }
+                row.addView(TextView(this).apply {
+                    text = "Page ${index + 1}"
+                    textSize = 12f
+                    typeface = Typeface.DEFAULT_BOLD
+                    setTextColor(Color.rgb(167, 139, 250))
+                }, matchWrap())
+                row.addView(name, matchWrap())
+                val controls = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                fun control(label: String, action: () -> Unit) {
+                    controls.addView(Button(this@MainActivity).apply {
+                        text = label
+                        isAllCaps = false
+                        textSize = 11f
+                        setOnClickListener {
+                            item.name = name.text.toString().trim().ifBlank { item.name }
+                            action()
+                        }
+                    }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { rightMargin = dp(4) })
+                }
+                control("↑") {
+                    if (index > 0) {
+                        val moved = items.removeAt(index)
+                        items.add(index - 1, moved)
+                        renderRows()
+                    }
+                }
+                control("↓") {
+                    if (index < items.lastIndex) {
+                        val moved = items.removeAt(index)
+                        items.add(index + 1, moved)
+                        renderRows()
+                    }
+                }
+                control("Delete") {
+                    items.removeAt(index)
+                    renderRows()
+                }
+                row.addView(controls, matchWrap())
+                content.addView(row, matchWrap().apply { bottomMargin = dp(8) })
+            }
+        }
+        renderRows()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                items.forEachIndexed { index, item ->
+                    val row = content.getChildAt(index + 1) as? LinearLayout
+                    val edit = row?.getChildAt(1) as? EditText
+                    edit?.text?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let { item.name = it }
+                }
+                showBatchExportOptions(items)
+                dialog.dismiss()
+            }
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                items.forEachIndexed { index, item ->
+                    val row = content.getChildAt(index + 1) as? LinearLayout
+                    val edit = row?.getChildAt(1) as? EditText
+                    edit?.text?.toString()?.trim()?.takeIf { it.isNotBlank() }?.let { item.name = it }
+                }
+                if (items.isEmpty()) {
+                    toast("Keep at least one page to export")
+                } else {
+                    exportPagesAsZip(items, 85)
+                    dialog.dismiss()
+                }
+            }
+        }
+        dialog.show()
+        dialog.window?.setLayout((resources.displayMetrics.widthPixels * 0.94).toInt(), (resources.displayMetrics.heightPixels * 0.78).toInt())
+    }
+
+    private fun showBatchExportOptions(pages: List<ScannedPage>) {
+        if (pages.isEmpty()) {
+            toast("Keep at least one page to export")
+            return
+        }
+        val choices = arrayOf("Combined PDF", "Separate JPEG images", "ZIP of individual-page PDFs")
+        AlertDialog.Builder(this)
+            .setTitle("Export ${pages.size} page(s)")
+            .setItems(choices) { _, which ->
+                when (which) {
+                    0 -> askCompression(85) { quality -> exportCombinedPdf(pages, quality) }
+                    1 -> askCompression(85) { quality -> exportJpegs(pages, quality) }
+                    2 -> askCompression(85) { quality -> exportPagesAsZip(pages, quality) }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun askCompression(defaultQuality: Int, onSelected: (Int) -> Unit) {
+        val layout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), dp(8))
+        }
+        val valueLabel = TextView(this).apply {
+            text = "Image quality: $defaultQuality%"
+            textSize = 15f
+            setTextColor(Color.WHITE)
+        }
+        val slider = android.widget.SeekBar(this).apply {
+            max = 60
+            progress = (defaultQuality - 40).coerceIn(0, 60)
+        }
+        slider.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                valueLabel.text = "Image quality: ${progress + 40}% (lower size at lower quality)"
+            }
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {}
+        })
+        layout.addView(valueLabel, matchWrap())
+        layout.addView(slider, matchWrap())
+        AlertDialog.Builder(this)
+            .setTitle("Compression")
+            .setMessage("Choose image quality. Lower quality usually makes smaller files.")
+            .setView(layout)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Export") { _, _ -> onSelected(slider.progress + 40) }
+            .show()
+    }
+
+    private fun loadScannedBitmap(uri: Uri, quality: Int): Bitmap {
+        val original = contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) }
+            ?: throw IllegalStateException("Could not read a scanned page")
+        if (quality >= 100) return original
+        val bytes = java.io.ByteArrayOutputStream()
+        original.compress(Bitmap.CompressFormat.JPEG, quality, bytes)
+        val compressed = BitmapFactory.decodeByteArray(bytes.toByteArray(), 0, bytes.size())
+            ?: return original
+        if (compressed !== original) original.recycle()
+        return compressed
+    }
+
+    private fun safePageName(name: String, index: Int): String {
+        val clean = name.trim().replace(Regex("[\\\\/:*?\"<>|]"), "_").trim('.')
+        return (clean.ifBlank { "Page_${(index + 1).toString().padStart(2, '0')}" }).take(100)
+    }
+
+    private fun exportCombinedPdf(pages: List<ScannedPage>, quality: Int) {
+        val bitmaps = mutableListOf<Bitmap>()
+        try {
+            pages.forEach { bitmaps.add(loadScannedBitmap(it.uri, quality)) }
+            if (bitmaps.isEmpty()) throw IllegalStateException("No pages to export")
+            val folder = outputFolder()
+            if (!folder.exists() && !folder.mkdirs()) throw IllegalStateException("Could not create ScanPro folder")
+            val file = File(folder, "ScanPro_Batch_${System.currentTimeMillis()}.pdf")
+            val document = PdfDocument()
+            try {
+                bitmaps.forEachIndexed { index, bitmap ->
+                    val pageInfo = PdfDocument.PageInfo.Builder(595, 842, index + 1).create()
+                    val page = document.startPage(pageInfo)
+                    val margin = 24f
+                    val scale = min((595f - margin * 2) / bitmap.width, (842f - margin * 2) / bitmap.height)
+                    val width = bitmap.width * scale
+                    val height = bitmap.height * scale
+                    val left = (595f - width) / 2f
+                    val top = (842f - height) / 2f
+                    page.canvas.drawColor(Color.WHITE)
+                    page.canvas.drawBitmap(bitmap, null, RectF(left, top, left + width, top + height), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                    document.finishPage(page)
+                }
+                FileOutputStream(file).use { document.writeTo(it) }
+            } finally { document.close() }
+            toast("Combined PDF saved: ${file.name}")
+            buildHome()
+        } catch (e: Exception) {
+            toast("PDF export failed: ${e.localizedMessage ?: "unknown error"}")
+        } finally { bitmaps.forEach { if (!it.isRecycled) it.recycle() } }
+    }
+
+    private fun exportJpegs(pages: List<ScannedPage>, quality: Int) {
+        try {
+            val folder = File(outputFolder(), "Batch_${System.currentTimeMillis()}")
+            if (!folder.exists() && !folder.mkdirs()) throw IllegalStateException("Could not create export folder")
+            pages.forEachIndexed { index, page ->
+                val bitmap = loadScannedBitmap(page.uri, quality)
+                try {
+                    val file = File(folder, safePageName(page.name, index) + ".jpg")
+                    FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.JPEG, quality, it) }
+                } finally { bitmap.recycle() }
+            }
+            toast("Saved ${pages.size} JPEG page(s) in ${folder.name}")
+            buildHome()
+        } catch (e: Exception) {
+            toast("JPEG export failed: ${e.localizedMessage ?: "unknown error"}")
+        }
+    }
+
+    private fun exportPagesAsZip(pages: List<ScannedPage>, quality: Int) {
+        val tempFiles = mutableListOf<File>()
+        try {
+            val folder = outputFolder()
+            if (!folder.exists() && !folder.mkdirs()) throw IllegalStateException("Could not create ScanPro folder")
+            val stamp = System.currentTimeMillis()
+            val zipFile = File(folder, "ScanPro_Pages_$stamp.zip")
+            java.util.zip.ZipOutputStream(FileOutputStream(zipFile)).use { zip ->
+                pages.forEachIndexed { index, page ->
+                    val bitmap = loadScannedBitmap(page.uri, quality)
+                    val temp = File(cacheDir, "scanpro_page_${stamp}_$index.pdf")
+                    tempFiles.add(temp)
+                    val document = PdfDocument()
+                    try {
+                        val pageInfo = PdfDocument.PageInfo.Builder(595, 842, 1).create()
+                        val pdfPage = document.startPage(pageInfo)
+                        val margin = 24f
+                        val scale = min((595f - margin * 2) / bitmap.width, (842f - margin * 2) / bitmap.height)
+                        val width = bitmap.width * scale
+                        val height = bitmap.height * scale
+                        val left = (595f - width) / 2f
+                        val top = (842f - height) / 2f
+                        pdfPage.canvas.drawColor(Color.WHITE)
+                        pdfPage.canvas.drawBitmap(bitmap, null, RectF(left, top, left + width, top + height), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG))
+                        document.finishPage(pdfPage)
+                        FileOutputStream(temp).use { document.writeTo(it) }
+                    } finally {
+                        document.close()
+                        bitmap.recycle()
+                    }
+                    val entryName = safePageName(page.name, index) + ".pdf"
+                    zip.putNextEntry(java.util.zip.ZipEntry(entryName))
+                    temp.inputStream().use { it.copyTo(zip) }
+                    zip.closeEntry()
+                }
+            }
+            toast("ZIP saved: ${zipFile.name} (${pages.size} individual PDFs; no combined PDF/JPEG)")
+            buildHome()
+        } catch (e: Exception) {
+            toast("ZIP export failed: ${e.localizedMessage ?: "unknown error"}")
+        } finally { tempFiles.forEach { it.delete() } }
     }
 
     private fun saveScannedPdf(uri: Uri) {
